@@ -21,6 +21,24 @@ Un tool gestionale in Python per automatizzare le spedizioni con **ShipItalia** 
 * **`logger.py`**: Sistema di logging rotativo (elimina automaticamente i log più vecchi di 30 giorni) e decoratore `@traccia`.
 * **`utils.py`** & **`input_utils.py`**: Funzioni di supporto per calcoli peso, parsing indirizzi e input utente.
 
+spedizioni shipitalia/
+│
+├── config/                  # File di configurazione statica
+│   └── mittente.txt         # Dati predefiniti del mittente
+│
+├── etichette/               # (Generata) Contiene i PDF scaricati
+│
+├── logs/                    # (Generata) Contiene i log giornalieri
+│
+├── .env                     # Password e API Key (SOLO IN LOCALE)
+│
+├── main.py                  # Punto di ingresso e Menu principale
+├── ebay.py                  # Logica API eBay (Ordini/Tracking)
+├── shipitalia.py            # Logica API ShipItalia (Etichette)
+├── logger.py                # Sistema di tracciamento e rotazione log
+├── config.py                # Validazione variabili d'ambiente
+├── input_utils.py           # Gestione input utente e indirizzi
+└── utils.py                 # Funzioni tecniche (Peso, Sessioni HTTP)
 ---
 
 ## 🚀 Installazione e Configurazione
