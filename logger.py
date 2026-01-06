@@ -1,0 +1,131 @@
+import os
+import time
+import functools
+from datetime import datetime
+
+# --- CONFIGURAZIONE ---
+K = 30                  # I log più vecchi di questi giorni verranno cancellati
+CARTELLA_LOG = "logs"   # Nome della cartella
+
+class GestoreLog:
+    def __init__(self, cartella_output=CARTELLA_LOG, giorni_conservazione=K):
+        self.cartella = cartella_output
+        self.giorni_conservazione = giorni_conservazione
+        
+        # 1. Crea la cartella se non esiste
+        if not os.path.exists(self.cartella):
+            try:
+                os.makedirs(self.cartella)
+                print(f"[Sistema] Cartella '{self.cartella}' creata.")
+            except OSError as e:
+                print(f"[Sistema] Errore creazione cartella log: {e}")
+
+        # 2. Esegue la pulizia automatica all'avvio
+        self._pulizia_automatica()
+
+    def _pulizia_automatica(self):
+        #Elimina i file .txt più vecchi di K giorni
+        try:
+            adesso = time.time()
+            limite_tempo = adesso - (self.giorni_conservazione * 86400) # 86400 sec = 1 giorno
+            count = 0
+            
+            if os.path.exists(self.cartella):
+                for nome_file in os.listdir(self.cartella):
+                    percorso = os.path.join(self.cartella, nome_file)
+                    # Controlla che sia un file .txt
+                    if os.path.isfile(percorso) and nome_file.endswith(".txt"):
+                        if os.path.getmtime(percorso) < limite_tempo:
+                            os.remove(percorso)
+                            count += 1
+            if count > 0:
+                print(f"[Sistema] Pulizia completata: rimossi {count} file vecchi.")
+        except Exception as e:
+            print(f"[Sistema] Errore pulizia log: {e}")
+
+    def _scrivi(self, livello, icona, messaggio):
+        #Scrive fisicamente nel file giornaliero.
+        adesso = datetime.now()
+        # Nome file rotativo: log_YYYY-mm-dd.txt
+        nome_file = f"log_{adesso.strftime('%Y-%m-%d')}.txt"
+        percorso = os.path.join(self.cartella, nome_file)
+        
+        # Formato: [ORA] | ICONA LIVELLO | MESSAGGIO
+        riga = f"[{adesso.strftime('%H:%M:%S')}] | {icona} {livello:<7} | {messaggio}\n"
+
+        try:
+            with open(percorso, "a", encoding="utf-8") as f:
+                f.write(riga)
+            # print(riga.strip()) ## Togliere # per visualizzare a schermo i log
+        except Exception as e:
+            print(f"!!! Errore scrittura log: {e}")
+
+    # --- Metodi rapidi ---
+    def info(self, msg):    self._scrivi("INFO", "ℹ️ ", msg)
+    def successo(self, msg): self._scrivi("OK", "✅ ", msg)
+    def errore(self, msg):   self._scrivi("ERROR", "❌ ", msg)
+    def warning(self, msg):  self._scrivi("WARN", "⚠️ ", msg)
+    def debug(self, msg):    self._scrivi("DEBUG", "🔍 ", msg)
+
+# --- INIZIALIZZAZIONE ---
+log = GestoreLog()
+
+
+# --- IL DECORATORE PER TRACCIARE LE FUNZIONI ---
+def traccia(func):
+    """
+    Metti @traccia sopra qualsiasi funzione per loggare automaticamente:
+    - Quando inizia
+    - Che dati riceve
+    - Quando finisce
+    - Se va in errore
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        nome_func = func.__name__
+        # Logga l'avvio con i parametri (utile per debuggare richieste API)
+        log.debug(f"▶️ START: {nome_func} | Input: {args} {kwargs}")
+        
+        try:
+            risultato = func(*args, **kwargs)
+            # Logga la fine
+            log.debug(f"⏹️ END:   {nome_func} | Esito: OK")
+            return risultato
+            
+        except Exception as e:
+            # Logga il crash e poi rilancia l'errore per non bloccare il flusso 'try/except' esterno
+            log.errore(f"💥 CRASH: {nome_func} fallita! Motivo: {e}")
+            raise e 
+    return wrapper
+
+if __name__ == "__main__":
+    
+    # 1. Esempio: Una funzione normale che fa una richiesta (simulata)
+    @traccia
+    def scarica_ordini_ebay(stato_ordine):
+        log.info("Contattando il server eBay...")
+        time.sleep(1) # Simula attesa
+        return ["Ordine #123", "Ordine #456"]
+
+    # 2. Esempio: Una funzione che accetta dati e calcola qualcosa
+    @traccia
+    def calcola_costo_spedizione(peso, corriere="DHL"):
+        if peso > 100:
+            raise ValueError("Pacco troppo pesante per questo corriere!")
+        return peso * 5.50
+
+    # --- ESECUZIONE REALE ---
+    log.successo("Programma avviato correttamente.")
+
+    try:
+        # Chiamata tracciata con successo
+        ordini = scarica_ordini_ebay("DA_SPEDIRE")
+        log.info(f"Ho trovato {len(ordini)} ordini.")
+
+        # Chiamata tracciata che andrà in ERRORE (simulato)
+        costo = calcola_costo_spedizione(150, corriere="Poste")
+
+    except Exception as e:
+        log.warning("Il programma ha gestito un errore ed è andato avanti.")
+
+    log.successo("Programma terminato.")

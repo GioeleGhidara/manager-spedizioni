@@ -1,0 +1,49 @@
+import math
+import re
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from config import HTTP_RETRIES, HTTP_BACKOFF_FACTOR
+
+def get_robust_session():
+    session = requests.Session()
+    retry = Retry(
+        total=HTTP_RETRIES,
+        read=HTTP_RETRIES,
+        connect=HTTP_RETRIES,
+        backoff_factor=HTTP_BACKOFF_FACTOR,
+        status_forcelist=[500, 502, 503, 504],
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+def arrotonda_peso_per_eccesso(peso: float) -> float:
+    if peso <= 0:
+        raise ValueError("Il peso deve essere positivo")
+    return math.ceil(peso * 2) / 2
+
+def normalizza_telefono(tel: str) -> str:
+    """
+    Formatta il telefono per ShipItalia (toglie prefisso intl).
+    """
+    tel = "".join(filter(str.isdigit, tel))
+    if tel.startswith("0039"):
+        tel = tel[4:]
+    elif tel.startswith("39") and len(tel) > 10:
+        tel = tel[2:]
+    return tel
+
+def valido_order_id(order_id: str) -> bool:
+    """
+    Verifica se l'Order ID ha un formato plausibile.
+    Accetta sia il formato Legacy (12-12345-12345) 
+    sia il formato REST API (v1|...|0).
+    """
+    # Se contiene pipe | è sicuramente un ID tecnico REST
+    if "|" in order_id:
+        return True
+    
+    # Altrimenti controlliamo il formato classico con i trattini
+    return bool(re.match(r"^\d{2}-\d{5}-\d{5}$", order_id))

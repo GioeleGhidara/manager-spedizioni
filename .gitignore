@@ -1,0 +1,16 @@
+# File con password e chiavi (FONDAMENTALE)
+.env
+
+# Cartelle di output (non servono su GitHub)
+logs/
+etichette/
+__pycache__/
+
+# Dati personali
+config/mittente.txt
+storico_locale.json
+
+# Ambienti virtuali (se ne usi)
+venv/
+.idea/
+.vscode/
