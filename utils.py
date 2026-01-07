@@ -6,14 +6,30 @@ from urllib3.util.retry import Retry
 from config import HTTP_RETRIES, HTTP_BACKOFF_FACTOR
 
 def get_robust_session():
+    """
+    Crea una requests.Session con retry/backoff robusti.
+
+    Note:
+    - include retry anche su POST (utile per API esterne che possono rispondere 5xx/429)
+    - rispetta Retry-After quando presente
+    """
     session = requests.Session()
-    retry = Retry(
+    retry_kwargs = dict(
         total=HTTP_RETRIES,
         read=HTTP_RETRIES,
         connect=HTTP_RETRIES,
         backoff_factor=HTTP_BACKOFF_FACTOR,
-        status_forcelist=[500, 502, 503, 504],
+        status_forcelist=[408, 429, 500, 502, 503, 504],
+        respect_retry_after_header=True,
     )
+
+    allowed = frozenset({"HEAD", "GET", "OPTIONS", "POST", "PUT", "DELETE"})
+    try:
+        retry = Retry(**retry_kwargs, allowed_methods=allowed)
+    except TypeError:
+        # Compatibilità con urllib3 < 2 (parametro rinominato)
+        retry = Retry(**retry_kwargs, method_whitelist=allowed)
+
     adapter = HTTPAdapter(max_retries=retry)
     session.mount("http://", adapter)
     session.mount("https://", adapter)

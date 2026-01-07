@@ -3,7 +3,8 @@ import os
 import time
 
 # Imposta encoding per evitare errori su Windows con icone
-sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
 
 from config import validate_config
 from logger import log, traccia

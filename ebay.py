@@ -1,11 +1,9 @@
-import os
 import requests
 import xml.etree.ElementTree as ET
-from dotenv import load_dotenv
 from logger import log, traccia
-from utils import normalizza_telefono
+from utils import normalizza_telefono, get_robust_session
+from config import EBAY_XML_TOKEN
 
-load_dotenv()
 
 EBAY_XML_API_URL = "https://api.ebay.com/ws/api.dll"
 
@@ -67,7 +65,7 @@ def _parse_indirizzo_xml(order_element):
 
 @traccia
 def scarica_lista_ordini(giorni_storico=30):
-    token = os.getenv("EBAY_XML_TOKEN")
+    token = EBAY_XML_TOKEN
     if not token:
         log.errore("Token XML eBay mancante")
         print("⚠️ Manca token XML.")
@@ -93,9 +91,12 @@ def scarica_lista_ordini(giorni_storico=30):
 
     da_spedire = []
     in_viaggio = []
+    session = get_robust_session()
+
 
     try:
-        response = requests.post(EBAY_XML_API_URL, data=xml_body, headers=headers, timeout=30)
+        response = session.post(EBAY_XML_API_URL, data=xml_body, headers=headers, timeout=30)
+        response.raise_for_status()
         
         # 1. Parsing dell'XML ricevuto
         try:
@@ -183,10 +184,12 @@ def gestisci_ordine_ebay(order_id, tracking):
 
 @traccia
 def invia_tracking_xml(order_id, tracking, carrier):
-    token = os.getenv("EBAY_XML_TOKEN")
+    token = EBAY_XML_TOKEN
     if not token: raise RuntimeError("Manca EBAY_XML_TOKEN.")
     
     order_id_clean = order_id.strip().replace(" ", "")
+    session = get_robust_session()
+
     
     xml_body = f"""<?xml version="1.0" encoding="utf-8"?>
 <CompleteSaleRequest xmlns="urn:ebay:apis:eBLBaseComponents">
@@ -201,17 +204,27 @@ def invia_tracking_xml(order_id, tracking, carrier):
   </Shipment>
 </CompleteSaleRequest>"""
     
-    headers = { "X-EBAY-API-SITEID": "101", "X-EBAY-API-CALL-NAME": "CompleteSale", "Content-Type": "text/xml", "X-EBAY-API-COMPATIBILITY-LEVEL": "1131" }
+    headers = {
+        "X-EBAY-API-SITEID": "101",
+        "X-EBAY-API-COMPATIBILITY-LEVEL": "1131",
+        "X-EBAY-API-CALL-NAME": "CompleteSale",
+        "Content-Type": "text/xml",
+    }
     
     print(f"   ☁️  Invio tracking a eBay ({order_id_clean})...")
-    response = requests.post(EBAY_XML_API_URL, data=xml_body, headers=headers, timeout=30)
+    response = session.post(EBAY_XML_API_URL, data=xml_body, headers=headers, timeout=30)
+    response.raise_for_status()
     
-    if "<Ack>Failure</Ack>" in response.text:
-        try:
-            root = ET.fromstring(response.content)
-            err = _find_text(root, "LongMessage")
-            raise ValueError(f"eBay ha risposto Failure: {err}")
-        except:
-            raise ValueError("eBay ha risposto Failure (errore generico)")
-            
+    # Parsing risposta eBay (anche quando HTTP è 200 può esserci Ack=Failure)
+    try:
+        root = ET.fromstring(response.content)
+        ack = _find_text(root, "Ack")
+        if ack == "Failure":
+            err = _find_text(root, "LongMessage") or _find_text(root, "ShortMessage")
+            raise ValueError(f"eBay ha risposto Failure: {err}" if err else "eBay ha risposto Failure")
+    except ET.ParseError:
+        # Se non è XML valido, ci basiamo su testo/HTTP
+        if response.status_code >= 400:
+            raise ValueError(f"Risposta eBay non valida (HTTP {response.status_code})")
+
     return True

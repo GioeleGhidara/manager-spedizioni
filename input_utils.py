@@ -30,10 +30,10 @@ def parse_indirizzo_blocco(testo: str):
 
     # 1. Cerca la riga del CAP
     for i, riga in enumerate(righe):
-        m = re.search(r"\b(\d{5})\s+(.+)", riga)
+        m = re.search(r"(?:\bIT[-\s]?)?(\d{5})\b[\s,]+(.+)", riga, re.IGNORECASE)
         if m:
             idx_cap = i
-            dati_citta = {"postalCode": m.group(1), "city": m.group(2).strip()}
+            dati_citta = {"postalCode": m.group(1), "city": m.group(2).strip().lstrip(",").strip()}
             break
     
     if idx_cap == -1:

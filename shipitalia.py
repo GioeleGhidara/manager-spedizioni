@@ -4,21 +4,25 @@ import webbrowser
 from config import API_URL_SHIPITALIA, SHIPITALIA_API_KEY
 from logger import log, traccia # <--- IMPORT CORRETTO
 from utils import get_robust_session
+import copy
 
 def _trunca(testo, lunghezza_max):
     if not testo: return ""
     return testo[:lunghezza_max].strip()
 
 def _prepara_payload_sicuro(payload):
-    p = payload.copy()
+    """
+    Rende il payload più "sicuro" per l'API, senza modificare l'oggetto originale.
+    Troncamento campi per limiti ShipItalia.
+    """
+    p = copy.deepcopy(payload) if payload is not None else {}
     for role in ['sender', 'recipient']:
-        if role in p:
+        if role in p and isinstance(p[role], dict):
             p[role]['name'] = _trunca(p[role].get('name', ''), 40)
             p[role]['address'] = _trunca(p[role].get('address', ''), 40)
             p[role]['city'] = _trunca(p[role].get('city', ''), 36)
     return p
 
-@traccia
 def get_lista_spedizioni(limit=10):
     """
     Scarica la lista delle ultime spedizioni.
@@ -80,16 +84,24 @@ def verifica_stato_tracking(tracking_code):
     """
     Ottiene informazioni su una spedizione tramite codice di tracking.
     Documentazione: GET /api/tracking/:code
+
+    Ritorno (sempre): dict con chiavi standard.
     """
     session = get_robust_session()
-    
-    # Costruiamo l'URL dinamico come richiesto dalla documentazione
-    # Es: https://shipitalia.com/api/tracking/IT123456789
     url_tracking = f"https://shipitalia.com/api/tracking/{tracking_code}"
+
+    result = {
+        "ok": False,
+        "trackingCode": tracking_code,
+        "status": None,
+        "status_code": None,
+        "data": None,
+        "error": None,
+        "message": None,
+    }
 
     try:
         log.info(f"Verifica stato tracking: {tracking_code}...")
-        
         response = session.get(
             url_tracking,
             headers={
@@ -98,32 +110,50 @@ def verifica_stato_tracking(tracking_code):
             },
             timeout=30,
         )
-        
-        # Gestione errori specifici (es. 401 Unauthorized, 404 Not Found)
-        if response.status_code == 404:
-            log.warning(f"Tracking {tracking_code} non trovato.")
-            return "Non Trovato"
-            
-        response.raise_for_status()
-        dati = response.json()
-        
-        # Analizziamo la risposta (in base alla struttura standard delle API ShipItalia)
-        # Se la documentazione non specifica i campi esatti di risposta, stampiamo tutto per debug la prima volta.
-        if "data" in dati:
-            info = dati["data"]
-            # Ipotizziamo ci sia un campo 'status' o simile, altrimenti restituiamo tutto il blocco
-            stato = info.get("status", "Stato non specificato") 
-            log.info(f"Stato ricevuto: {stato}")
-            return info
-        else:
-            log.warning(f"Risposta imprevista: {dati}")
-            return dati
+        result["status_code"] = response.status_code
 
+        if response.status_code == 404:
+            result["error"] = "not_found"
+            result["message"] = "Spedizione non trovata"
+            return result
+        if response.status_code == 401:
+            result["error"] = "unauthorized"
+            result["message"] = "API key non valida o non autorizzata"
+            return result
+
+        response.raise_for_status()
+
+        dati = response.json() if response.content else None
+        result["data"] = dati
+
+        # Tentiamo di estrarre un dizionario "info" coerente se presente
+        info = None
+        if isinstance(dati, dict):
+            info = dati.get("data") if "data" in dati else dati
+        if isinstance(info, dict):
+            result["status"] = info.get("status") or info.get("state")
+
+        result["ok"] = True
+        return result
+
+    except requests.exceptions.RequestException as e:
+        log.errore(f"Errore controllo tracking {tracking_code}: {e}")
+        result["error"] = "request_error"
+        result["message"] = str(e)
+        # Se abbiamo una response, proviamo ad attaccare il body per debug
+        try:
+            if getattr(e, "response", None) is not None:
+                result["status_code"] = e.response.status_code
+                result["data"] = e.response.text
+        except Exception:
+            pass
+        return result
     except Exception as e:
         log.errore(f"Errore controllo tracking {tracking_code}: {e}")
-        return None
+        result["error"] = "exception"
+        result["message"] = str(e)
+        return result
 
-@traccia
 def scarica_pdf(url_pdf, tracking):
     session = get_robust_session()
     try:

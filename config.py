@@ -10,8 +10,6 @@ HTTP_BACKOFF_FACTOR = 1  # 1s, 2s, 4s...
 
 # --- VARIABILI D'AMBIENTE ---
 SHIPITALIA_API_KEY = os.getenv("SHIPITALIA_API_KEY")
-EBAY_CLIENT_ID = os.getenv("EBAY_CLIENT_ID")
-EBAY_CLIENT_SECRET = os.getenv("EBAY_CLIENT_SECRET")
 EBAY_XML_TOKEN = os.getenv("EBAY_XML_TOKEN") # <--- NUOVA VARIABILE
 
 API_URL_SHIPITALIA = "https://shipitalia.com/api/generate-label"
@@ -21,10 +19,9 @@ def validate_config():
     """Controlla variabili necessarie."""
     required = {
         "SHIPITALIA_API_KEY": SHIPITALIA_API_KEY,
-        "EBAY_CLIENT_ID": EBAY_CLIENT_ID,
-        "EBAY_CLIENT_SECRET": EBAY_CLIENT_SECRET,
-        "EBAY_XML_TOKEN": EBAY_XML_TOKEN, # <--- CONTROLLO AGGIUNTO
+        "EBAY_XML_TOKEN": EBAY_XML_TOKEN,
     }
     missing = [key for key, val in required.items() if not val]
     if missing:
         raise RuntimeError(f"Variabili d'ambiente mancanti: {', '.join(missing)}")
+
