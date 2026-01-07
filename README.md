@@ -14,12 +14,14 @@ Un tool gestionale in Python per automatizzare le spedizioni con **ShipItalia** 
 
 ## 📂 Struttura del Progetto
 
-* **`main.py`**: Il cuore del programma. Gestisce il menu ciclico e il flusso delle operazioni.
-* **`ebay.py`**: Gestisce la comunicazione con eBay (scarico ordini, upload tracking) utilizzando un parsing XML sicuro.
-* **`shipitalia.py`**: Gestisce le API di ShipItalia (creazione etichetta, recupero storico, tracking).
-* **`config.py`**: Gestisce la configurazione, le variabili d'ambiente e verifica la presenza delle chiavi.
-* **`logger.py`**: Sistema di logging rotativo (elimina automaticamente i log più vecchi di 30 giorni) e decoratore `@traccia`.
-* **`utils.py`** & **`input_utils.py`**: Funzioni di supporto per calcoli peso, parsing indirizzi e input utente.
+* **`main.py`**: Il cuore del programma. Gestisce il menu e il flusso.
+* **`check_token.py`**: Modulo per verificare la validità e la data di scadenza del token eBay.
+* **`ebay.py`**: Gestisce la comunicazione con eBay (scarico ordini, upload tracking).
+* **`shipitalia.py`**: Gestisce le API di ShipItalia (etichette, storico, sanitizzazione).
+* **`history.py`**: Gestisce il salvataggio e la lettura dello storico locale JSON.
+* **`config.py`**: Centralizza la configurazione e le variabili d'ambiente.
+* **`logger.py`**: Sistema di logging rotativo con decoratore `@traccia`.
+* **`utils.py`** & **`input_utils.py`**: Funzioni di supporto (peso, retry HTTP, input).
 
 ```bash
 spedizioni shipitalia/
@@ -32,6 +34,8 @@ spedizioni shipitalia/
 ├── logs/                    # (Generata) Contiene i log giornalieri
 │
 ├── .env                     # Password e API Key (SOLO IN LOCALE)
+│
+├── storico_spedizioni.json  # (Generata) Database locale spedizioni
 │
 ├── main.py                  # Punto di ingresso e Menu principale
 ├── ebay.py                  # Logica API eBay (Ordini/Tracking)
@@ -52,7 +56,6 @@ Assicurati di avere **Python** installato sul tuo computer.
 Installa le librerie necessarie eseguendo questo comando nel terminale:
 ```bash
 pip install requests python-dotenv
-
 ```
 
 ### 3. File .env o Variabili di Sistema
@@ -62,8 +65,14 @@ pip install requests python-dotenv
 Crea un file chiamato **`.env`** nella cartella principale del progetto e inserisci le tue chiavi API:
 
 ```env
+# --- OBBLIGATORI PER SPEDIRE ---
 SHIPITALIA_API_KEY=tua_chiave_shipitalia
 EBAY_XML_TOKEN=tuo_token_xml_ebay
+
+# --- OPZIONALI (Per vedere i giorni alla scadenza Token) ---
+EBAY_APP_ID=tuo_app_id
+EBAY_DEV_ID=tuo_dev_id
+EBAY_CERT_ID=tuo_cert_id
 ```
 **Metodo B: Variabili di Sistema (Avanzato):**
 
@@ -103,10 +112,14 @@ python main.py
 * L'indirizzo può essere inserito manualmente o incollato a blocchi.
 
 
-4. **🔍 Storico Spedizioni & PDF:**
+4. **🔍 Storico ShipItalia (API):**
 * Mostra la lista delle ultime etichette generate su ShipItalia.
 * Permette di vedere i dettagli (peso, stato tracking).
 * Permette di **riscaricare il PDF** dell'etichetta se non lo trovi più.
+
+5. **📒 Storico Locale (Dettagliato):**
+* Legge il file storico_spedizioni.json.
+* Mantiene traccia di tutto ciò che hai spedito, inclusi i titoli degli oggetti.
 
 ---
 
