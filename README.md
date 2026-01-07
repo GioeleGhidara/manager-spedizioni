@@ -55,13 +55,20 @@ pip install requests python-dotenv
 
 ```
 
-### 3. File .env
+### 3. File .env o Variabili di Sistema
 
+**Metodo A: File .env (Standard):**
 Crea un file chiamato **`.env`** nella cartella principale del progetto e inserisci le tue chiavi API:
 
 ```env
 SHIPITALIA_API_KEY=tua_chiave_shipitalia
 EBAY_XML_TOKEN=tuo_token_xml_ebay
+```
+**Metodo B: Variabili di Sistema (Avanzato):**
+Se preferisci non usare il file .env, puoi impostare le chiavi direttamente come Variabili d'Ambiente nel tuo sistema operativo (Windows/Linux/Mac). Le variabili richieste sono:
+```env
+SHIPITALIA_API_KEY
+EBAY_XML_TOKEN
 ```
 
 *(Nota: Il token XML è fondamentale per le operazioni di scrittura su eBay)*
