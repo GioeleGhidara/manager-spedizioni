@@ -1,6 +1,7 @@
 import sys
 import os
 import time
+import webbrowser
 
 # Imposta encoding per evitare errori su Windows con icone
 if hasattr(sys.stdout, 'reconfigure'):
@@ -9,7 +10,6 @@ if hasattr(sys.stdout, 'reconfigure'):
 from config import validate_config
 from logger import log
 from utils import valido_order_id
-# RIMOSSO: from db_manager import confronta_e_notifica
 
 from input_utils import (
     chiedi_peso, 
@@ -58,7 +58,7 @@ def main():
             print("👋 Alla prossima!")
             break
 
-        # --- OPZIONE 1: DASHBOARD SENZA NOTIFICHE DB ---
+        # --- OPZIONE 1: DASHBOARD INTERATTIVA ---
         elif scelta_iniziale == "1":
             da_spedire, in_viaggio = scarica_lista_ordini(giorni_storico=30)
 
@@ -67,46 +67,75 @@ def main():
                 input("\nPremi INVIO per tornare al menu...")
                 continue
 
-            print("\n" + "="*115)
-            print(f" {'#':<3} | {'ID ORDINE':<16} | {'DATA':<11} | {'UTENTE':<15} | {'TITOLO OGGETTO'}")
-            print("="*115)
+            # Creiamo una numerazione continua
+            # Esempio: 1..3 sono da spedire, 4..6 sono in viaggio
+            count_da_spedire = len(da_spedire)
+            count_in_viaggio = len(in_viaggio)
+            
+            print("\n" + "="*120)
+            print(f" {'#':<3} | {'ID ORDINE':<14} | {'DATA':<11} | {'UTENTE':<15} | {'TRACKING / STATO':<18} | {'TITOLO OGGETTO'}")
+            print("="*120)
 
+            # --- SEZIONE DA SPEDIRE ---
             if da_spedire:
-                print(" 🔴  DA SPEDIRE (PAGATI)")
+                print(" 🔴  DA SPEDIRE")
                 for i, o in enumerate(da_spedire):
-                    print(f" {i+1:<3} | {o['order_id'][:16]:<16} | {o['date']:<11} | {o['buyer']:<15} | {o['title']}")
+                    idx = i + 1
+                    print(f" {idx:<3} | {o['order_id'][:14]:<14} | {o['date']:<11} | {o['buyer']:<15} | {'DA SPEDIRE':<18} | {o['title']}")
             else:
                 print(" ✅  Tutto spedito!")
 
-            print("-" * 115)
+            print("-" * 120)
 
+            # --- SEZIONE IN VIAGGIO ---
             if in_viaggio:
                 print(" 🚚  IN VIAGGIO")
-                for o in in_viaggio:
-                    print(f" {'•':<3} | {o['order_id'][:16]:<16} | {o['shipped_at']:<11} | {o['buyer']:<15} | {o['title']}")
+                for i, o in enumerate(in_viaggio):
+                    idx = count_da_spedire + i + 1
+                    trk_display = o.get('tracking', 'N.D.')
+                    print(f" {idx:<3} | {o['order_id'][:14]:<14} | {o['shipped_at']:<11} | {o['buyer']:<15} | {trk_display:<18} | {o['title']}")
             
-            print("="*115)
+            print("="*120)
             
-            if not da_spedire:
-                input("\nPremi INVIO per tornare al menu...")
-                continue
-
             while True:
-                sel = input("\nNumero ordine da spedire (0 torna al menu): ").strip()
+                prompt_msg = "\nNumero ordine (per Spedire o Tracciare, 0 Menu): "
+                sel = input(prompt_msg).strip()
+                
                 if sel == '0':
                     skip_standard_flow = True 
                     break 
+                
                 try:
-                    idx = int(sel) - 1
-                    if 0 <= idx < len(da_spedire):
-                        ordine = da_spedire[idx]
+                    idx_scelto = int(sel)
+                    
+                    # CASO 1: Selezione "DA SPEDIRE"
+                    if 1 <= idx_scelto <= count_da_spedire:
+                        idx_array = idx_scelto - 1
+                        ordine = da_spedire[idx_array]
                         order_id = ordine['order_id']
                         destinatario_auto = ordine['destinatario']
-                        print(f"\n✅ Selezionato: {ordine['title']}")
-                        log.info(f"Selezionato da dashboard: {order_id}")
-                        break 
+                        print(f"\n✅ Selezionato per SPEDIZIONE: {ordine['title']}")
+                        log.info(f"Selezionato da dashboard (Spedizione): {order_id}")
+                        break # Esce dal loop e va al flusso creazione etichetta
+                    
+                    # CASO 2: Selezione "IN VIAGGIO"
+                    elif count_da_spedire < idx_scelto <= (count_da_spedire + count_in_viaggio):
+                        idx_array = idx_scelto - count_da_spedire - 1
+                        ordine = in_viaggio[idx_array]
+                        trk = ordine.get('tracking')
+                        
+                        if trk and trk != "N.D.":
+                            url = f"https://www.poste.it/cerca/#/risultati-spedizioni/{trk}"
+                            print(f"\n   🌍 Apro tracking Poste: {trk}")
+                            webbrowser.open(url)
+                        else:
+                            print("\n   ⚠️  Tracking non disponibile o formato non valido.")
+                        
+                        # Non facciamo break qui, rimaniamo nella dashboard così puoi cliccarne altri
+                    
                     else:
                         print("❌ Numero non valido.")
+
                 except ValueError:
                     print("❌ Inserisci un numero.")
             
@@ -125,6 +154,7 @@ def main():
         elif scelta_iniziale == "3":
             pass 
 
+        # --- OPZIONE 4: STORICO ---
         elif scelta_iniziale == "4":
             print("\n   ☁️  Scarico storico ShipItalia...")
             lista = get_lista_spedizioni(limit=15)
@@ -134,21 +164,24 @@ def main():
                 time.sleep(2)
                 continue
 
-            print("\n" + "="*100)
+            # --- TABELLA RIEPILOGATIVA ---
+            print("\n" + "="*95)
             print(f" {'#':<3} | {'TRACKING':<15} | {'DATA':<16} | {'STATO':<12} | {'PDF'}")
-            print("="*100)
+            print("="*95)
 
             for i, sped in enumerate(lista):
                 trk = sped.get("trackingCode", "N.D.")
-                raw_date = sped.get("createdAt", "")[:16].replace("T", " ")
+                # Data formattata più pulita
+                raw_date = sped.get("createdAt", "")[:16].replace("T", " ") 
                 stato = sped.get("status", "N.D.")
                 has_pdf = "📥 SI" if sped.get("labelUrl") else "   NO"
                 print(f" {i+1:<3} | {trk:<15} | {raw_date:<16} | {stato:<12} | {has_pdf}")
 
-            print("-" * 100)
+            print("-" * 95)
 
+            # --- SELEZIONE E AZIONI ---
             while True:
-                sel = input("\nScegli numero per DETTAGLI/PDF (0 Menu): ").strip()
+                sel = input("\nScegli numero per DETTAGLI (0 Menu): ").strip()
                 if sel == '0': break 
                 
                 try:
@@ -158,24 +191,39 @@ def main():
                         trk = scelta.get("trackingCode")
                         pdf_url = scelta.get("labelUrl")
                         
-                        print(f"\n📦 Tracking: {trk}")
-                        print(f"   Stato: {scelta.get('status')}")
-                        print(f"   Peso:  {scelta.get('weight')} kg")
+                        # URL Poste Italiane dinamico
+                        url_poste = f"https://www.poste.it/cerca/#/risultati-spedizioni/{trk}"
                         
-                        if pdf_url:
-                            risp = input("   Vuoi riscaricare il PDF? (S/N): ").lower()
-                            if risp == 's':
-                                scarica_pdf(pdf_url, trk)
-                                print("   ✅ Fatto.")
-                                time.sleep(1) 
-                        else:
-                            print("   ⚠️  PDF non disponibile.")
-                        break 
+                        print(f"\n📦 DETTAGLI SPEDIZIONE")
+                        print(f"   Tracking: {trk}")
+                        print(f"   Stato:    {scelta.get('status')}")
+                        print(f"   Peso:     {scelta.get('weight')} kg")
+                        print(f"   Link:     {url_poste}")
+                        
+                        # --- LOOP SOTTO-MENU AZIONI ---
+                        while True:
+                            print("\n   [T] 🌍 Apri Tracking Poste  |  [P] 📥 Scarica PDF  |  [INVIO] Indietro")
+                            azione = input("   Cosa vuoi fare? ").strip().lower()
+
+                            if azione == 't':
+                                print(f"   🚀 Apro il browser su Poste.it...")
+                                webbrowser.open(url_poste)
+                            
+                            elif azione == 'p':
+                                if pdf_url:
+                                    scarica_pdf(pdf_url, trk)
+                                    print("   ✅ PDF scaricato/aperto.")
+                                else:
+                                    print("   ⚠️  PDF non disponibile per questa spedizione.")
+                            
+                            else:
+                                break 
                     else:
                         print("❌ Numero non valido.")
                 except ValueError:
                     print("❌ Inserisci un numero.")
             
+            # Torna al menu principale dopo aver finito con lo storico
             continue 
 
         else:
