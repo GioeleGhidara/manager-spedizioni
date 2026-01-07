@@ -8,7 +8,7 @@ __pycache__/
 
 # Dati personali
 config/mittente.txt
-storico_locale.json
+storico_spedizioni.json
 
 # Ambienti virtuali (se ne usi)
 venv/
