@@ -1,16 +1,28 @@
-# File con password e chiavi (FONDAMENTALE)
+# --- Python & Cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.spec
+
+# --- Ambienti Virtuali ---
+venv/
+.venv/
+env/
+
+# --- SICUREZZA (Chiavi API) ---
 .env
 
-# Cartelle di output (non servono su GitHub)
+# --- File Generati dal Tool ---
+# Ignora i log giornalieri
 logs/
-etichette/
-__pycache__/
 
-# Dati personali
-config/mittente.txt
+# Ignora i PDF scaricati
+etichette/
+mittente.txt
+
+# Ignora il database locale (rimuovi questa riga se vuoi il backup su Git)
 storico_spedizioni.json
 
-# Ambienti virtuali (se ne usi)
-venv/
-.idea/
-.vscode/
+# --- File di Sistema Operativo ---
+.DS_Store
+Thumbs.db
