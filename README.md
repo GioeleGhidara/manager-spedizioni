@@ -61,10 +61,7 @@ Crea un file chiamato **`.env`** nella cartella principale del progetto e inseri
 
 ```env
 SHIPITALIA_API_KEY=tua_chiave_shipitalia
-EBAY_CLIENT_ID=tuo_client_id_ebay
-EBAY_CLIENT_SECRET=tuo_client_secret_ebay
 EBAY_XML_TOKEN=tuo_token_xml_ebay
-
 ```
 
 *(Nota: Il token XML è fondamentale per le operazioni di scrittura su eBay)*
