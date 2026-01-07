@@ -9,7 +9,8 @@ if hasattr(sys.stdout, 'reconfigure'):
 from config import validate_config
 from logger import log
 from utils import valido_order_id
-from db_manager import confronta_e_notifica # <--- NUOVO IMPORT
+# RIMOSSO: from db_manager import confronta_e_notifica
+
 from input_utils import (
     chiedi_peso, 
     carica_mittente, 
@@ -40,7 +41,7 @@ def main():
         pulisci_schermo()
         print("=== SPEDIZIONE MANAGER ===")
         print("\nCosa vuoi fare?")
-        print("1) 📋 Dashboard Ordini (Novità & Da Spedire)")
+        print("1) 📋 Dashboard Ordini (eBay)")
         print("2) ⌨️  Inserisci manualmente Order ID")
         print("3) 🚀 Etichetta rapida (No eBay)")
         print("4) 🔍 Storico Spedizioni & PDF")
@@ -57,22 +58,9 @@ def main():
             print("👋 Alla prossima!")
             break
 
-        # --- OPZIONE 1: DASHBOARD CON NOTIFICHE ---
+        # --- OPZIONE 1: DASHBOARD SENZA NOTIFICHE DB ---
         elif scelta_iniziale == "1":
             da_spedire, in_viaggio = scarica_lista_ordini(giorni_storico=30)
-
-            # --- BLOCCO NOTIFICHE ---
-            tutti = da_spedire + in_viaggio
-            notifiche = confronta_e_notifica(tutti)
-            
-            if notifiche:
-                print("\n🔔  NOVITÀ DALL'ULTIMO CONTROLLO:")
-                for n in notifiche:
-                    print(f"   {n}")
-                print("-" * 60)
-                input("Premi INVIO per vedere la tabella ordini...")
-                pulisci_schermo()
-            # ------------------------
 
             if not da_spedire and not in_viaggio:
                 print("\n✅ Nessun ordine attivo (Tutto spedito o vuoto).")
