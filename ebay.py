@@ -101,16 +101,20 @@ def scarica_lista_ordini(giorni_storico=30):
             created_raw = _find_text(order, "CreatedTime")
             created_fmt = _format_data(created_raw)
             
-            # --- BLOCCO SICUREZZA PAGAMENTI ---
+            # --- BLOCCO SICUREZZA PAGAMENTI & DATE ---
             paid_time = _find_text(order, "PaidTime")
             shipped_time = _find_text(order, "ShippedTime")
             delivery_time = _find_text(order, "ActualDeliveryTime")
             
-            # Se NON c'è PaidTime, l'utente non ha pagato -> SALTIAMO
+            # SE NON PAGATO -> IGNORA
             if not paid_time:
                 log.info(f"Ordine {order_id} ignorato: NON ANCORA PAGATO.")
                 continue 
-            # ----------------------------------
+            
+            # Formattazione Date per Notifiche
+            shipped_fmt = _format_data(shipped_time) if shipped_time else "-"
+            delivered_fmt = _format_data(delivery_time) if delivery_time else "-"
+            # -----------------------------------------
 
             titolo = "Oggetto eBay"
             transaction = order.find(".//ns:Transaction", EBAY_NS)
@@ -129,16 +133,18 @@ def scarica_lista_ordini(giorni_storico=30):
                     "buyer": buyer,
                     "date": created_fmt,
                     "title": titolo_corto,
-                    "destinatario": destinatario
+                    "destinatario": destinatario,
+                    "shipped_at": shipped_fmt,
+                    "delivered_at": delivered_fmt,
+                    "amount": _find_text(order, "AmountPaid")
                 }
 
-                # Logica aggiornata:
-                # 1. Deve essere PAGATO (già filtrato sopra)
-                # 2. Se non ha ShippedTime -> DA SPEDIRE
+                # Logica Stati
                 if not shipped_time:
+                    obj_ordine["status_interno"] = "DA_SPEDIRE"
                     da_spedire.append(obj_ordine)
-                # 3. Se ha ShippedTime ma non DeliveryTime -> IN VIAGGIO
                 elif not delivery_time:
+                    obj_ordine["status_interno"] = "IN_VIAGGIO"
                     in_viaggio.append(obj_ordine)
 
         log.info(f"Trovati {len(da_spedire)} da spedire (PAGATI) e {len(in_viaggio)} in viaggio.")

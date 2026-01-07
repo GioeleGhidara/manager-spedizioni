@@ -7,8 +7,9 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
 from config import validate_config
-from logger import log, traccia
+from logger import log
 from utils import valido_order_id
+from db_manager import confronta_e_notifica # <--- NUOVO IMPORT
 from input_utils import (
     chiedi_peso, 
     carica_mittente, 
@@ -22,7 +23,6 @@ from shipitalia import genera_etichetta, verifica_stato_tracking, get_lista_sped
 from ebay import gestisci_ordine_ebay, scarica_lista_ordini
 
 def pulisci_schermo():
-    """Pulisce la console per mantenere l'interfaccia ordinata."""
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def main():
@@ -36,56 +36,66 @@ def main():
         log.errore(msg)
         return
 
-    # --- LOOP PRINCIPALE (Il programma non esce mai finché non premi 0) ---
     while True:
         pulisci_schermo()
         print("=== SPEDIZIONE MANAGER ===")
         print("\nCosa vuoi fare?")
-        print("1) 📋 Dashboard Ordini (Da Spedire / In Viaggio)")
+        print("1) 📋 Dashboard Ordini (Novità & Da Spedire)")
         print("2) ⌨️  Inserisci manualmente Order ID")
         print("3) 🚀 Etichetta rapida (No eBay)")
         print("4) 🔍 Storico Spedizioni & PDF")
         print("0) ❌ Esci")
         
         scelta_iniziale = input("\nScelta (0-4): ").strip()
-        if scelta_iniziale: log.info(f"Utente nel menu principale: scelta {scelta_iniziale}")
+        if scelta_iniziale: log.info(f"Menu principale: {scelta_iniziale}")
         
-        # Variabili di appoggio per il flusso
         order_id = ""
         destinatario_auto = None
-        skip_standard_flow = False # Serve per saltare la creazione etichetta se usiamo menu 1 (solo visualizzazione) o 4
+        skip_standard_flow = False 
 
-        # --- USCITA ---
         if scelta_iniziale == "0":
             print("👋 Alla prossima!")
             break
 
-        # --- OPZIONE 1: DASHBOARD ---
+        # --- OPZIONE 1: DASHBOARD CON NOTIFICHE ---
         elif scelta_iniziale == "1":
             da_spedire, in_viaggio = scarica_lista_ordini(giorni_storico=30)
 
+            # --- BLOCCO NOTIFICHE ---
+            tutti = da_spedire + in_viaggio
+            notifiche = confronta_e_notifica(tutti)
+            
+            if notifiche:
+                print("\n🔔  NOVITÀ DALL'ULTIMO CONTROLLO:")
+                for n in notifiche:
+                    print(f"   {n}")
+                print("-" * 60)
+                input("Premi INVIO per vedere la tabella ordini...")
+                pulisci_schermo()
+            # ------------------------
+
             if not da_spedire and not in_viaggio:
-                print("\n✅ Nessun ordine attivo.")
+                print("\n✅ Nessun ordine attivo (Tutto spedito o vuoto).")
                 input("\nPremi INVIO per tornare al menu...")
-                continue # Torna al menu principale
+                continue
 
             print("\n" + "="*115)
             print(f" {'#':<3} | {'ID ORDINE':<16} | {'DATA':<11} | {'UTENTE':<15} | {'TITOLO OGGETTO'}")
             print("="*115)
 
             if da_spedire:
-                print(" 🔴  DA SPEDIRE")
+                print(" 🔴  DA SPEDIRE (PAGATI)")
                 for i, o in enumerate(da_spedire):
                     print(f" {i+1:<3} | {o['order_id'][:16]:<16} | {o['date']:<11} | {o['buyer']:<15} | {o['title']}")
             else:
-                print(" ✅  Nessun ordine da spedire.")
+                print(" ✅  Tutto spedito!")
 
             print("-" * 115)
 
             if in_viaggio:
                 print(" 🚚  IN VIAGGIO")
                 for o in in_viaggio:
-                    print(f" {'•':<3} | {o['order_id'][:16]:<16} | {o['date']:<11} | {o['buyer']:<15} | {o['title']}")
+                    print(f" {'•':<3} | {o['order_id'][:16]:<16} | {o['shipped_at']:<11} | {o['buyer']:<15} | {o['title']}")
             
             print("="*115)
             
@@ -93,12 +103,11 @@ def main():
                 input("\nPremi INVIO per tornare al menu...")
                 continue
 
-            # Selezione ordine
             while True:
                 sel = input("\nNumero ordine da spedire (0 torna al menu): ").strip()
                 if sel == '0':
-                    skip_standard_flow = True # Salta il resto e...
-                    break # ...esce dal while di selezione
+                    skip_standard_flow = True 
+                    break 
                 try:
                     idx = int(sel) - 1
                     if 0 <= idx < len(da_spedire):
@@ -106,16 +115,15 @@ def main():
                         order_id = ordine['order_id']
                         destinatario_auto = ordine['destinatario']
                         print(f"\n✅ Selezionato: {ordine['title']}")
-                        log.info(f"Selezionato ordine dalla Dashboard: {order_id} ({ordine['buyer']})")
-                        break # Esce e prosegue col flusso standard
+                        log.info(f"Selezionato da dashboard: {order_id}")
+                        break 
                     else:
                         print("❌ Numero non valido.")
                 except ValueError:
                     print("❌ Inserisci un numero.")
             
-            if skip_standard_flow: continue # Torna al menu principale
+            if skip_standard_flow: continue 
 
-        # --- OPZIONE 2: MANUALE ---
         elif scelta_iniziale == "2":
             input_ebay = input("Incolla Order ID eBay: ").strip()
             if valido_order_id(input_ebay):
@@ -126,11 +134,9 @@ def main():
                 time.sleep(1)
                 continue
 
-        # --- OPZIONE 3: RAPIDA ---
         elif scelta_iniziale == "3":
-            pass # Prosegue diretto al flusso standard
+            pass 
 
-        # --- OPZIONE 4: STORICO & PDF (Modificata come richiesto) ---
         elif scelta_iniziale == "4":
             print("\n   ☁️  Scarico storico ShipItalia...")
             lista = get_lista_spedizioni(limit=15)
@@ -153,17 +159,15 @@ def main():
 
             print("-" * 100)
 
-            # Loop di selezione (interno allo storico)
             while True:
                 sel = input("\nScegli numero per DETTAGLI/PDF (0 Menu): ").strip()
-                if sel == '0': break # Esce dal while e torna al menu principale
+                if sel == '0': break 
                 
                 try:
                     idx = int(sel) - 1
                     if 0 <= idx < len(lista):
                         scelta = lista[idx]
                         trk = scelta.get("trackingCode")
-                        log.info(f"Utente consulta dettagli storico: {trk}")
                         pdf_url = scelta.get("labelUrl")
                         
                         print(f"\n📦 Tracking: {trk}")
@@ -175,7 +179,7 @@ def main():
                             if risp == 's':
                                 scarica_pdf(pdf_url, trk)
                                 print("   ✅ Fatto.")
-                                time.sleep(1) # Un secondo per leggere "Fatto"
+                                time.sleep(1) 
                         else:
                             print("   ⚠️  PDF non disponibile.")
                         break 
@@ -184,14 +188,14 @@ def main():
                 except ValueError:
                     print("❌ Inserisci un numero.")
             
-            continue # Torna al while True principale (Menu)
+            continue 
 
-        # --- CATTURA INPUT NON VALIDI ---
         else:
             print("❌ Scelta non valida.")
             time.sleep(1)
             continue
         
+        # --- FLUSSO CREAZIONE ETICHETTA ---
         try:
             peso = chiedi_peso()
             mittente = carica_mittente()
@@ -210,13 +214,11 @@ def main():
             }
             if sconto: payload["discountCode"] = sconto
 
-            # Conferma
             while True:
                 stampa_riepilogo(payload, order_id)
                 if conferma_operazione(): break
                 else: gestisci_modifiche(payload)
 
-            # Generazione
             print("\n⏳ Generazione in corso...")
             result = genera_etichetta(payload)
             tracking = result["trackingCode"]
@@ -228,7 +230,7 @@ def main():
                 gestisci_ordine_ebay(order_id, tracking)
 
             print("\n✅ Operazione conclusa con successo!")
-            input("Premi INVIO per tornare al menu...") # Qui serve per vedere il risultato prima di pulire lo schermo
+            input("Premi INVIO per tornare al menu...") 
 
         except Exception as e:
             print(f"❌ Errore durante il processo: {e}")
