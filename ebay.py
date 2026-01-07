@@ -4,10 +4,7 @@ from xml.sax.saxutils import escape
 from datetime import datetime
 from logger import log, traccia
 from utils import normalizza_telefono, get_robust_session
-from config import EBAY_XML_TOKEN
-
-EBAY_XML_API_URL = "https://api.ebay.com/ws/api.dll"
-EBAY_NS = {'ns': 'urn:ebay:apis:eBLBaseComponents'}
+from config import EBAY_XML_TOKEN, EBAY_XML_API_URL, EBAY_NS
 
 def _find_text(root, tag_name):
     if root is None: return ""

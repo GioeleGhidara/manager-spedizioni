@@ -74,26 +74,32 @@ log = GestoreLog()
 # --- IL DECORATORE PER TRACCIARE LE FUNZIONI ---
 def traccia(func):
     """
-    Metti @traccia sopra qualsiasi funzione per loggare automaticamente:
-    - Quando inizia
-    - Che dati riceve
-    - Quando finisce
-    - Se va in errore
+    Versione 2.0: Logga Input, Output (riassunto) ed Errori.
     """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         nome_func = func.__name__
-        # Logga l'avvio con i parametri (utile per debuggare richieste API)
+        # Log Input
         log.debug(f"▶️ START: {nome_func} | Input: {args} {kwargs}")
         
         try:
             risultato = func(*args, **kwargs)
-            # Logga la fine
-            log.debug(f"⏹️ END:   {nome_func} | Esito: OK")
+            
+            # --- NOVITÀ: Log Output (intelligente) ---
+            out_log = str(risultato)
+            # Se è troppo lungo (es. file binario o lista enorme), lo tagliamo
+            if len(out_log) > 100:
+                if isinstance(risultato, list):
+                    out_log = f"Lista di {len(risultato)} elementi"
+                elif isinstance(risultato, dict):
+                    out_log = f"Dizionario con {len(risultato)} chiavi"
+                else:
+                    out_log = out_log[:100] + "..."
+            
+            log.debug(f"⏹️ END:   {nome_func} | Output: {out_log}")
             return risultato
             
         except Exception as e:
-            # Logga il crash e poi rilancia l'errore per non bloccare il flusso 'try/except' esterno
             log.errore(f"💥 CRASH: {nome_func} fallita! Motivo: {e}")
             raise e 
     return wrapper

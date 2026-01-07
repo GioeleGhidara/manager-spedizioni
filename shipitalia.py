@@ -1,32 +1,34 @@
 import os
 import requests
 import webbrowser
-from config import API_URL_SHIPITALIA, SHIPITALIA_API_KEY
-from logger import log, traccia # <--- IMPORT CORRETTO
-from utils import get_robust_session
 import copy
-
-def _trunca(testo, lunghezza_max):
-    if not testo: return ""
-    return testo[:lunghezza_max].strip()
+from config import API_URL_SHIPITALIA, SHIPITALIA_API_KEY
+from logger import log, traccia
+from utils import get_robust_session
 
 def _prepara_payload_sicuro(payload):
     """
-    Rende il payload più "sicuro" per l'API, senza modificare l'oggetto originale.
-    Troncamento campi per limiti ShipItalia.
+    Rende il payload più "sicuro" per l'API.
+    Pulisce spazi e tronca i testi troppo lunghi.
     """
     p = copy.deepcopy(payload) if payload is not None else {}
     for role in ['sender', 'recipient']:
         if role in p and isinstance(p[role], dict):
-            p[role]['name'] = _trunca(p[role].get('name', ''), 40)
-            p[role]['address'] = _trunca(p[role].get('address', ''), 40)
-            p[role]['city'] = _trunca(p[role].get('city', ''), 36)
+            # MIGLIORIA: Facciamo strip() PRIMA di tagliare a 40 caratteri.
+            # Così se c'è spazio all'inizio, non perdiamo lettere del nome.
+            p[role]['name'] = str(p[role].get('name', '')).strip()[:40]
+            p[role]['address'] = str(p[role].get('address', '')).strip()[:40]
+            p[role]['city'] = str(p[role].get('city', '')).strip()[:36]
+            # Il cap lo limitiamo a 10 per sicurezza
+            if 'postalCode' in p[role]:
+                p[role]['postalCode'] = str(p[role].get('postalCode', '')).strip()[:10]
     return p
 
+@traccia
 def get_lista_spedizioni(limit=10):
     """
     Scarica la lista delle ultime spedizioni.
-    Cerca automaticamente la lista reale dentro la risposta.
+    Gestisce la struttura {data: {shipments: [...]}} scoperta col test.
     """
     session = get_robust_session()
     url = f"https://shipitalia.com/api/shipments?page=1&limit={limit}"
@@ -34,10 +36,7 @@ def get_lista_spedizioni(limit=10):
     try:
         response = session.get(
             url,
-            headers={
-                "x-api-key": SHIPITALIA_API_KEY,
-                "Content-Type": "application/json",
-            },
+            headers={"x-api-key": SHIPITALIA_API_KEY, "Content-Type": "application/json"},
             timeout=30,
         )
         
@@ -46,32 +45,20 @@ def get_lista_spedizioni(limit=10):
             return []
 
         json_data = response.json()
-        
-        # 1. Verifica se c'è la chiave 'data'
-        if isinstance(json_data, dict) and "data" in json_data:
-            contenuto = json_data["data"]
-            
-            # CASO A: 'data' è direttamente la lista (perfetto)
-            if isinstance(contenuto, list):
-                return contenuto
-            
-            # CASO B: 'data' è un dizionario (contenitore) -> Cerchiamo la lista dentro
-            if isinstance(contenuto, dict):
-                # Cerca qualsiasi valore che sia una lista
-                for chiave, valore in contenuto.items():
-                    if isinstance(valore, list):
-                        # Trovata! Restituiamo questa lista
-                        # (es. contenuto['shipments'] o contenuto['items'])
-                        return valore
-                
-                # Se arriviamo qui, è un dizionario ma senza liste dentro.
-                # Stampiamo le chiavi per capire come si chiamano i campi
-                print(f"⚠️ TROVATO DIZIONARIO MA NESSUNA LISTA. Chiavi disponibili: {list(contenuto.keys())}")
-                return []
+        dati = json_data.get("data", [])
 
-        # 2. Fallback: Se il JSON principale è una lista
-        if isinstance(json_data, list):
-            return json_data
+        # CASO 1: Lista diretta (raro, ma possibile)
+        if isinstance(dati, list):
+            return dati
+        
+        # CASO 2: Struttura a dizionario (Shipments + Pagination)
+        # È quello che abbiamo scoperto grazie al tuo test!
+        if isinstance(dati, dict):
+            if "shipments" in dati:
+                return dati["shipments"]
+            # Fallback generico
+            if "items" in dati:
+                return dati["items"]
 
         return []
 
@@ -83,9 +70,6 @@ def get_lista_spedizioni(limit=10):
 def verifica_stato_tracking(tracking_code):
     """
     Ottiene informazioni su una spedizione tramite codice di tracking.
-    Documentazione: GET /api/tracking/:code
-
-    Ritorno (sempre): dict con chiavi standard.
     """
     session = get_robust_session()
     url_tracking = f"https://shipitalia.com/api/tracking/{tracking_code}"
@@ -104,10 +88,7 @@ def verifica_stato_tracking(tracking_code):
         log.info(f"Verifica stato tracking: {tracking_code}...")
         response = session.get(
             url_tracking,
-            headers={
-                "x-api-key": SHIPITALIA_API_KEY,
-                "Content-Type": "application/json",
-            },
+            headers={"x-api-key": SHIPITALIA_API_KEY, "Content-Type": "application/json"},
             timeout=30,
         )
         result["status_code"] = response.status_code
@@ -118,7 +99,7 @@ def verifica_stato_tracking(tracking_code):
             return result
         if response.status_code == 401:
             result["error"] = "unauthorized"
-            result["message"] = "API key non valida o non autorizzata"
+            result["message"] = "API key non valida"
             return result
 
         response.raise_for_status()
@@ -126,7 +107,6 @@ def verifica_stato_tracking(tracking_code):
         dati = response.json() if response.content else None
         result["data"] = dati
 
-        # Tentiamo di estrarre un dizionario "info" coerente se presente
         info = None
         if isinstance(dati, dict):
             info = dati.get("data") if "data" in dati else dati
@@ -136,20 +116,8 @@ def verifica_stato_tracking(tracking_code):
         result["ok"] = True
         return result
 
-    except requests.exceptions.RequestException as e:
-        log.errore(f"Errore controllo tracking {tracking_code}: {e}")
-        result["error"] = "request_error"
-        result["message"] = str(e)
-        # Se abbiamo una response, proviamo ad attaccare il body per debug
-        try:
-            if getattr(e, "response", None) is not None:
-                result["status_code"] = e.response.status_code
-                result["data"] = e.response.text
-        except Exception:
-            pass
-        return result
     except Exception as e:
-        log.errore(f"Errore controllo tracking {tracking_code}: {e}")
+        log.errore(f"Errore tracking {tracking_code}: {e}")
         result["error"] = "exception"
         result["message"] = str(e)
         return result
@@ -172,8 +140,7 @@ def scarica_pdf(url_pdf, tracking):
         
         try:
             webbrowser.open(os.path.abspath(nome_file))
-        except:
-            pass 
+        except: pass 
             
         return nome_file
     except Exception as e:
@@ -193,10 +160,7 @@ def genera_etichetta(payload_originale):
         response = session.post(
             API_URL_SHIPITALIA,
             json=payload_clean,
-            headers={
-                "x-api-key": SHIPITALIA_API_KEY,
-                "Content-Type": "application/json",
-            },
+            headers={"x-api-key": SHIPITALIA_API_KEY, "Content-Type": "application/json"},
             timeout=30,
         )
         response.raise_for_status()
@@ -209,7 +173,6 @@ def genera_etichetta(payload_originale):
         if not tracking:
             raise ValueError("L'API non ha restituito un Tracking Code!")
 
-        # 4. Scaricamento Automatico PDF
         if pdf_url:
             scarica_pdf(pdf_url, tracking)
         
@@ -218,14 +181,9 @@ def genera_etichetta(payload_originale):
             "labelUrl": pdf_url
         }
 
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
         log.errore(f"Errore API ShipItalia: {e}")
-        # Logghiamo il payload che ha causato l'errore per debuggarlo
         log.debug(f"Payload fallito: {payload_clean}")
-        
-        if e.response is not None:
+        if hasattr(e, 'response') and e.response is not None:
             print(f"🔍 Dettagli errore server: {e.response.text}")
-            log.errore(f"Response Server: {e.response.text}")
-            
-        raise RuntimeError("Errore durante la generazione dell'etichetta") from e
-    
+        raise RuntimeError("Errore generazione etichetta") from e
