@@ -21,6 +21,7 @@ Un tool gestionale in Python per automatizzare le spedizioni con **ShipItalia** 
 * **`history.py`**: Gestisce il salvataggio e la lettura dello storico locale JSON.
 * **`config.py`**: Centralizza la configurazione e le variabili d'ambiente.
 * **`logger.py`**: Sistema di logging rotativo con decoratore `@traccia`.
+* **`ui.py`**: Gestisce le stampe.
 * **`utils.py`** & **`input_utils.py`**: Funzioni di supporto (peso, retry HTTP, input).
 
 ```bash
@@ -43,6 +44,7 @@ spedizioni shipitalia/
 ├── logger.py                # Sistema di tracciamento e rotazione log
 ├── config.py                # Validazione variabili d'ambiente
 ├── input_utils.py           # Gestione input utente e indirizzi
+├── ui.py                    # Logica stampe
 └── utils.py                 # Funzioni tecniche (Peso, Sessioni HTTP)
 ```
 ---
