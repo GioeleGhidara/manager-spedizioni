@@ -1,6 +1,5 @@
 import os
 import sys
-import webbrowser
 
 # Imposta encoding per Windows
 if hasattr(sys.stdout, 'reconfigure'):
@@ -16,11 +15,24 @@ def stampa_header():
 def stampa_menu_principale():
     print("\nCosa vuoi fare?")
     print("1) 📋 Dashboard Ordini (eBay)")
-    print("2) ⌨️  Inserisci Order ID")
-    print("3) 🚀 Etichetta rapida (No eBay)")
+    print("2) 📦 Spedisci da Lista (eBay)") 
+    print("3) 🚀 Etichetta rapida")
     print("4) 🔍 Storico ShipItalia (PDF e API)")
     print("5) 📒 Storico Locale (Dettagliato)")
     print("0) ❌ Esci")
+
+def chiedi_scelta_range(max_val):
+    """
+    Chiede input all'utente mostrando il range disponibile.
+    """
+    if max_val > 1:
+        prompt = f"\nScegli opzione (1-{max_val}) o 0 per Menu: "
+    elif max_val == 1:
+        prompt = f"\nScegli opzione (1) o 0 per Menu: "
+    else:
+        prompt = "\nNessuna opzione disponibile. Premi 0 per Menu: "
+    
+    return input(prompt).strip()
 
 def stampa_dashboard_ebay(da_spedire, in_viaggio):
     print("\n" + "=" * 120)
@@ -48,6 +60,27 @@ def stampa_dashboard_ebay(da_spedire, in_viaggio):
 
     print("=" * 120)
 
+# --- NUOVA FUNZIONE PER OPZIONE 2 ---
+def stampa_lista_selezione_ebay(da_spedire):
+    """
+    Stampa una tabella semplificata solo per la selezione 'Da Spedire'.
+    """
+    if not da_spedire:
+        print("\n✅ Nessun ordine in attesa di spedizione.")
+        return
+
+    print(f"\n📦 TROVATI {len(da_spedire)} ORDINI DA EVADERE:")
+    print("=" * 100)
+    print(f" {'#':<3} | {'DATA':<11} | {'UTENTE':<15} | {'TITOLO OGGETTO'}")
+    print("=" * 100)
+
+    for i, o in enumerate(da_spedire):
+        titolo = o['title'][:55] + ".." if len(o['title']) > 55 else o['title']
+        print(f" {i+1:<3} | {o['date']:<11} | {o['buyer']:<15} | {titolo}")
+    
+    print("-" * 100)
+# ------------------------------------
+
 def stampa_storico_api(lista):
     print("\n" + "=" * 75)
     print(f" {'#':<3} | {'TRACKING':<15} | {'DATA':<16} | {'STATO':<12} | {'PDF'}")
@@ -71,7 +104,7 @@ def stampa_dettaglio_spedizione(idx, spedizione):
     print(f"\n📦 DETTAGLI SPEDIZIONE #{idx+1}")
     print(f"   Tracking:    {url_poste}")
     print(f"   Scarica PDF: {pdf_url}")
-    print("\n(Fai CTRL+Click sui link qui sopra per aprirli)")
+    print("\n(Copia il link o usa CTRL+Click se supportato)")
 
 def stampa_storico_locale(storico):
     print("\n" + "=" * 110)

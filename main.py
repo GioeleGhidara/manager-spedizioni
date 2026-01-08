@@ -47,7 +47,8 @@ def main():
         ui.stampa_header()
         ui.stampa_menu_principale()
         
-        scelta = input("\nScelta (0-5): ").strip()
+        # Menu fisso 5 opzioni
+        scelta = ui.chiedi_scelta_range(5) 
         
         # Reset variabili per il nuovo giro
         order_id = ""
@@ -60,7 +61,7 @@ def main():
             ui.messaggio_uscita()
             break
 
-        # --- DASHBOARD EBAY ---
+        # --- OPZIONE 1: DASHBOARD COMPLETA (Overview) ---
         elif scelta == "1":
             da_spedire, in_viaggio = scarica_lista_ordini(30)
             
@@ -71,8 +72,9 @@ def main():
 
             ui.stampa_dashboard_ebay(da_spedire, in_viaggio)
 
+            totale = len(da_spedire) + len(in_viaggio)
             while True:
-                sel = input("\nNumero ordine (0 Menu): ").strip()
+                sel = ui.chiedi_scelta_range(totale)
                 if sel == '0': 
                     skip_creazione = True
                     break
@@ -81,8 +83,7 @@ def main():
                     idx = int(sel)
                     len_ds = len(da_spedire)
                     
-                    # Selezione "Da Spedire"
-                    if 1 <= idx <= len_ds:
+                    if 1 <= idx <= len_ds: # Da Spedire
                         ordine = da_spedire[idx - 1]
                         order_id = ordine['order_id']
                         destinatario_auto = ordine['destinatario']
@@ -91,8 +92,7 @@ def main():
                         print(f"\n✅ Selezionato: {titolo_oggetto}")
                         break
                     
-                    # Selezione "In Viaggio"
-                    elif len_ds < idx <= (len_ds + len(in_viaggio)):
+                    elif len_ds < idx <= totale: # In Viaggio
                         ordine = in_viaggio[idx - len_ds - 1]
                         trk = ordine.get('tracking')
                         if trk and trk != "N.D.":
@@ -101,24 +101,59 @@ def main():
                             ui.avviso_errore("Tracking non disponibile.")
                     else:
                         ui.avviso_errore("Numero non valido.")
-                except ValueError:
-                    pass
+                except ValueError: pass
             
             if skip_creazione: continue
 
-        # --- INSERIMENTO MANUALE ID ---
+        # --- OPZIONE 2: SPEDISCI DA LISTA (Selezione Rapida) ---
         elif scelta == "2":
-            input_ebay = input("Incolla Order ID eBay: ").strip()
-            if valido_order_id(input_ebay):
-                order_id = input_ebay
-                tipo_operazione = "EBAY"
-                titolo_oggetto = "Inserito manualmente"
-            else:
-                ui.avviso_errore("Formato ID non valido.")
-                time.sleep(1)
-                continue
+            print("\n☁️  Scarico ordini da spedire...")
+            # Scarichiamo solo gli ordini, ignorando quelli in viaggio
+            da_spedire, _ = scarica_lista_ordini(30)
 
-        # --- ETICHETTA RAPIDA ---
+            if not da_spedire:
+                ui.avviso_info("Nessun ordine da evadere trovato.")
+                # Fallback: se non c'è nulla, offriamo l'inserimento manuale
+                risp = input("Vuoi inserire l'ID manualmente? (s/n): ").strip().lower()
+                if risp != 's':
+                    continue
+                # Se dice SI, cade nel blocco di codice manuale qui sotto...
+                input_ebay = input("Incolla Order ID eBay: ").strip()
+                if valido_order_id(input_ebay):
+                    order_id = input_ebay
+                    tipo_operazione = "EBAY"
+                    titolo_oggetto = "Inserito manualmente"
+                else:
+                    ui.avviso_errore("ID non valido.")
+                    time.sleep(1)
+                    continue
+            else:
+                # Se ci sono ordini, mostriamo la lista di selezione
+                ui.stampa_lista_selezione_ebay(da_spedire)
+                
+                while True:
+                    sel = ui.chiedi_scelta_range(len(da_spedire))
+                    if sel == '0':
+                        skip_creazione = True
+                        break
+                    
+                    try:
+                        idx = int(sel)
+                        if 1 <= idx <= len(da_spedire):
+                            ordine = da_spedire[idx - 1]
+                            order_id = ordine['order_id']
+                            destinatario_auto = ordine['destinatario']
+                            titolo_oggetto = ordine['title']
+                            tipo_operazione = "EBAY"
+                            print(f"\n✅ Selezionato: {titolo_oggetto}")
+                            break
+                        else:
+                            ui.avviso_errore("Numero non valido.")
+                    except ValueError: pass
+                
+                if skip_creazione: continue
+
+        # --- ETICHETTA RAPIDA (NO EBAY) ---
         elif scelta == "3":
             tipo_operazione = "MANUALE"
             order_id = "MANUALE"
@@ -134,9 +169,9 @@ def main():
                 continue
 
             ui.stampa_storico_api(lista)
-
+            
             while True:
-                sel = input("\nQuale spedizione vuoi vedere? (0 Menu): ").strip()
+                sel = ui.chiedi_scelta_range(len(lista))
                 if sel == '0': break
                 try:
                     idx = int(sel) - 1
