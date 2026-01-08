@@ -21,6 +21,12 @@ def chiedi_codice_sconto() -> str:
 
 def parse_indirizzo_blocco(testo: str):
     """Analizza un indirizzo incollato a blocco."""
+    if len(testo) > 1000:
+        raise ValueError(
+            "Indirizzo troppo lungo (max 1000 caratteri). "
+            "Rimuovi testo inutile e riprova."
+        )
+
     righe = [r.strip() for r in testo.splitlines() if r.strip()]
     if len(righe) < 2:
         raise ValueError("Indirizzo troppo breve (servono almeno Nome e Via/Città)")

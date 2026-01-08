@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 import webbrowser
 import copy
@@ -130,10 +131,15 @@ def scarica_pdf(url_pdf, tracking):
         response.raise_for_status()
         
         os.makedirs("etichette", exist_ok=True)
-        nome_file = os.path.join("etichette", f"{tracking}.pdf")
-        
+
+        # 🔐 Sanitizzazione tracking per nome file
+        safe_tracking = re.sub(r"[^A-Za-z0-9_-]", "_", tracking)
+
+        nome_file = os.path.join("etichette", f"{safe_tracking}.pdf")
+
         with open(nome_file, "wb") as f:
             f.write(response.content)
+
             
         print(f"   💾 PDF Salvato: {nome_file}")
         log.info(f"PDF salvato in: {nome_file}")

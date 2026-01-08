@@ -3,6 +3,36 @@ import time
 import functools
 from datetime import datetime
 
+# --- BLURRER ---
+
+SENSITIVE_KEYS = {
+    "token", "apikey", "api_key",
+    "address", "phone", "name",
+    "postalcode", "city",
+    "tracking", "order_id"
+}
+
+def safe_repr(obj):
+    """
+    Rappresentazione sicura per i log.
+    Oscura automaticamente i campi sensibili.
+    """
+    try:
+        if isinstance(obj, dict):
+            return {
+                k: ("***" if k.lower() in SENSITIVE_KEYS else safe_repr(v))
+                for k, v in obj.items()
+            }
+        elif isinstance(obj, (list, tuple)):
+            return [safe_repr(x) for x in obj]
+        elif isinstance(obj, str):
+            if len(obj) > 60:
+                return obj[:20] + "..." + obj[-10:]
+            return obj
+        return obj
+    except Exception:
+        return "***"
+
 # --- CONFIGURAZIONE ---
 K = 30                  # I log più vecchi di questi giorni verranno cancellati
 CARTELLA_LOG = "logs"   # Nome della cartella
@@ -80,8 +110,8 @@ def traccia(func):
     def wrapper(*args, **kwargs):
         nome_func = func.__name__
         # Log Input
-        log.debug(f"▶️ START: {nome_func} | Input: {args} {kwargs}")
-        
+        log.debug(f"▶️ START: {nome_func} | Input: {safe_repr(args)} {safe_repr(kwargs)}")
+
         try:
             risultato = func(*args, **kwargs)
             
