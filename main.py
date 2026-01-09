@@ -78,8 +78,7 @@ def main():
         elif scelta == "1":
             # LOGICA CACHE: Scarico solo se vuota
             if not service.get_cache_last_update():
-                print("\n☁️  Scarico ordini da eBay...")
-            da_spedire, in_viaggio = service.carica_ordini_cached(30)
+                da_spedire, in_viaggio = service.carica_ordini_cached(30)
 
             if not da_spedire and not in_viaggio:
                 ui.avviso_info("Nessun ordine attivo trovato.")
@@ -97,7 +96,7 @@ def main():
                 
                 try:
                     idx = int(sel)
-                    action = service.resolve_lista_spedire(da_spedire, idx)
+                    action = service.resolve_dashboard(da_spedire, in_viaggio, idx)
                     if action["action"] == "order":
                         ordine = action["order"]
                         order_id = ordine['order_id']
@@ -106,6 +105,10 @@ def main():
                         tipo_operazione = "EBAY"
                         print(f"\nƒo. Selezionato: {titolo_oggetto}")
                         break
+                    elif action["action"] == "tracking":
+                        print(f"\n🚚 Tracking: {action['tracking']}")
+                        input("Premi INVIO per tornare indietro...")
+                        continue  
                     ui.avviso_errore("Numero non valido.")
                 except ValueError:
                     pass
@@ -116,8 +119,7 @@ def main():
         elif scelta == "2":
             # LOGICA CACHE: Scarico solo se vuota
             if not service.get_cache_last_update():
-                print("\n☁️  Scarico ordini da spedire...")
-            da_spedire, _in_viaggio = service.carica_ordini_cached(30)
+                da_spedire, _in_viaggio = service.carica_ordini_cached(30)
 
             if not da_spedire:
                 ui.avviso_info("Nessun ordine da evadere in memoria.")
