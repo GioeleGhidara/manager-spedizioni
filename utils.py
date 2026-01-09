@@ -63,3 +63,7 @@ def valido_order_id(order_id: str) -> bool:
     
     # Altrimenti controlliamo il formato classico con i trattini
     return bool(re.match(r"^\d{2}-\d{5}-\d{5}$", order_id))
+
+def genera_link_tracking(tracking_code: str) -> str:
+    """Genera il link diretto per il tracking (attualmente Poste Italiane)."""
+    return f"https://www.poste.it/cerca/#/risultati-spedizioni/{tracking_code}"

@@ -5,7 +5,7 @@ from datetime import datetime
 # Moduli interni
 from config import validate_config
 from logger import log
-from utils import valido_order_id
+from utils import valido_order_id, genera_link_tracking
 from check_token import check_scadenza_token_silenzioso
 
 # Nuova gestione UI
@@ -114,7 +114,7 @@ def main():
                         ordine = in_viaggio[idx - len_ds - 1]
                         trk = ordine.get('tracking')
                         if trk and trk != "N.D.":
-                            webbrowser.open(f"https://www.poste.it/cerca/#/risultati-spedizioni/{trk}")
+                            webbrowser.open(genera_link_tracking(trk))
                         else:
                             ui.avviso_errore("Tracking non disponibile.")
                     else:
