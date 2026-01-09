@@ -56,9 +56,7 @@ def main():
             print(f"⚡ Dati in memoria (Aggiornati alle {ora_str})")
         
         ui.stampa_menu_principale()
-        
-        # Menu fisso 5 opzioni (Rimosso riferimento alla 9)
-        scelta = ui.chiedi_scelta_range(5) 
+        scelta = ui.chiedi_scelta_range(5, label_zero="Uscire")
         
         # Reset variabili per il nuovo giro
         order_id = ""

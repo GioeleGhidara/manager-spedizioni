@@ -1,5 +1,5 @@
 import re
-from config import MITTENTE_FILE
+from ebay import get_mittente_ebay
 from utils import normalizza_telefono, arrotonda_peso_per_eccesso
 
 # --- FUNZIONI DI INPUT ---
@@ -116,20 +116,27 @@ def chiedi_destinatario():
             print(f"❌ Errore nell'inserimento: {e}")
 
 def carica_mittente():
-    """Chiede se usare mittente da file o manuale."""
+    """Scarica mittente da eBay (o fallback manuale)."""
     print("\n--- MITTENTE ---")
-    scelta = input("Il mittente sei tu (da file predefinito)? (S/N): ").strip().lower()
-
-    if scelta == 'n':
-        return chiedi_indirizzo_guidato()
     
-    try:
-        with open(MITTENTE_FILE, encoding="utf-8") as f:
-            return parse_indirizzo_blocco(f.read())
-    except Exception as e:
-        print(f"❌ Errore nel file mittente: {e}")
-        print("⚠️  Passiamo all'inserimento manuale.")
-        return chiedi_indirizzo_guidato()
+    # Tentativo automatico eBay
+    mittente_ebay = get_mittente_ebay()
+    
+    if mittente_ebay:
+        # Mostriamo l'indirizzo trovato per conferma
+        print("✅ Indirizzo recuperato da eBay:")
+        print(f"   {mittente_ebay.get('name', 'N.D.')}")
+        print(f"   {mittente_ebay.get('address', '')}")
+        print(f"   {mittente_ebay.get('postalCode', '')} {mittente_ebay.get('city', '')}")
+        
+        scelta = input("\nVuoi usare questo mittente? (S/N): ").strip().lower()
+        if scelta != 'n':
+            return mittente_ebay
+    else:
+        print("⚠️  Impossibile recuperare indirizzo da eBay (o richiesta fallita).")
+
+    print("⚠️  Passiamo all'inserimento manuale.")
+    return chiedi_indirizzo_guidato()
 
 # --- FUNZIONI DI OUTPUT (UI) & MODIFICA ---
 
@@ -171,7 +178,7 @@ def stampa_riepilogo(payload, order_id):
     print("=" * (W * 2 + 3) + "\n")
 
 def conferma_operazione() -> bool:
-    """Ritorna True se l'utente accetta, False se vuole modificare."""
+    #Ritorna True se l'utente accetta, False se vuole modificare.
     while True:
         risposta = input("Dati corretti? Confermi l'acquisto? (S/N): ").strip().lower()
         if risposta == "s":
@@ -180,9 +187,8 @@ def conferma_operazione() -> bool:
             return False
 
 def gestisci_modifiche(payload):
-    """
-    Menu interattivo per modificare i dati in caso di errore.
-    """
+    
+    #Menu interattivo per modificare i dati in caso di errore.
     print("\n🔧 MODIFICA DATI")
     print("1) Modifica MITTENTE")
     print("2) Modifica DESTINATARIO")

@@ -5,6 +5,8 @@ Un tool gestionale in Python per automatizzare le spedizioni con **ShipItalia** 
 ## ✨ Funzionalità Principali
 
 * **Dashboard Ordini eBay:** Scarica automaticamente gli ordini "Da Spedire" e "In Viaggio" da eBay.
+* **Cache Intelligente:** Salva i dati in memoria per una navigazione istantanea tra i menu.
+* **Mittente Automatico:** Preleva l'indirizzo del mittente direttamente dal tuo account eBay (Registration Address).
 * **Creazione Etichette:** Genera etichette di spedizione ShipItalia con un click, precompilando i dati del cliente.
 * **Sync Automatico:** Carica automaticamente il codice di tracking su eBay e segna l'ordine come spedito.
 * **Storico Interattivo:** Visualizza le ultime spedizioni create, controlla lo stato (Tracking) e permette di **riscaricare il PDF** in caso di smarrimento.
@@ -14,21 +16,20 @@ Un tool gestionale in Python per automatizzare le spedizioni con **ShipItalia** 
 
 ## 📂 Struttura del Progetto
 
-* **`main.py`**: Il cuore del programma. Gestisce il menu e il flusso.
+* **`main.py`**: Il cuore del programma. Gestisce il menu, la cache e il flusso.
 * **`check_token.py`**: Modulo per verificare la validità e la data di scadenza del token eBay.
-* **`ebay.py`**: Gestisce la comunicazione con eBay (scarico ordini, upload tracking).
+* **`ebay.py`**: Gestisce la comunicazione con eBay (scarico ordini, upload tracking, mittente).
 * **`shipitalia.py`**: Gestisce le API di ShipItalia (etichette, storico, sanitizzazione).
 * **`history.py`**: Gestisce il salvataggio e la lettura dello storico locale JSON.
 * **`config.py`**: Centralizza la configurazione e le variabili d'ambiente.
 * **`logger.py`**: Sistema di logging rotativo con decoratore `@traccia`.
-* **`ui.py`**: Gestisce le stampe.
+* **`ui.py`**: Gestisce le stampe e l'interfaccia utente.
 * **`utils.py`** & **`input_utils.py`**: Funzioni di supporto (peso, retry HTTP, input).
 
 ```bash
 spedizioni shipitalia/
 │
 ├── config/                  # File di configurazione statica
-│   └── mittente.txt         # Dati predefiniti del mittente
 │
 ├── etichette/               # (Generata) Contiene i PDF scaricati
 │
@@ -39,12 +40,12 @@ spedizioni shipitalia/
 ├── storico_spedizioni.json  # (Generata) Database locale spedizioni
 │
 ├── main.py                  # Punto di ingresso e Menu principale
-├── ebay.py                  # Logica API eBay (Ordini/Tracking)
+├── ebay.py                  # Logica API eBay (Ordini/Tracking/Mittente)
 ├── shipitalia.py            # Logica API ShipItalia (Etichette)
 ├── logger.py                # Sistema di tracciamento e rotazione log
 ├── config.py                # Validazione variabili d'ambiente
 ├── input_utils.py           # Gestione input utente e indirizzi
-├── ui.py                    # Logica stampe
+├── ui.py                    # Logica stampe e menu
 └── utils.py                 # Funzioni tecniche (Peso, Sessioni HTTP)
 ```
 ---
@@ -79,9 +80,16 @@ EBAY_CERT_ID=tuo_cert_id
 **Metodo B: Variabili di Sistema (Avanzato):**
 
 Se preferisci non usare il file .env, puoi impostare le chiavi direttamente come Variabili d'Ambiente nel tuo sistema operativo (Windows/Linux/Mac). Le variabili richieste sono:
+
 ```env
+# --- OBBLIGATORI PER SPEDIRE ---
 SHIPITALIA_API_KEY=tua_chiave_shipitalia
 EBAY_XML_TOKEN=tuo_token_xml_ebay
+
+# --- OPZIONALI (Per vedere i giorni alla scadenza Token) ---
+EBAY_APP_ID=tuo_app_id
+EBAY_DEV_ID=tuo_dev_id
+EBAY_CERT_ID=tuo_cert_id
 ```
 
 *(Nota: Il token XML è fondamentale per le operazioni di scrittura su eBay)*
@@ -101,12 +109,12 @@ python main.py
 
 1. **📋 Dashboard Ordini:**
 * Visualizza una tabella con gli ordini eBay da spedire.
-* Digita il numero dell'ordine per avviare subito la creazione dell'etichetta.
-* Visualizza anche gli ordini "In Viaggio" per monitoraggio.
+* Clicca su un ordine per spedirlo o su un ordine "In Viaggio" per vedere il tracking.
 
 
-2. **⌨️ Inserisci manualmente Order ID:**
-* Utile se vuoi spedire un ordine eBay specifico di cui conosci già l'ID, saltando la dashboard.
+2. **📦 Spedisci da Lista (eBay):**
+* Mostra la lista rapida degli ordini da evadere.
+* Se non ce ne sono, permette l'inserimento manuale dell'Order ID.
 
 
 3. **🚀 Etichetta rapida (No eBay):**

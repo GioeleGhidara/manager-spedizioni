@@ -30,16 +30,13 @@ def stampa_menu_principale():
 
 # ------------------------------------
 
-def chiedi_scelta_range(max_val):
-    """
-    Chiede input all'utente mostrando il range disponibile.
-    """
+def chiedi_scelta_range(max_val, label_zero="Menu"):
     if max_val > 1:
-        prompt = f"\nScegli opzione (1-{max_val}) o 0 per Menu: "
+        prompt = f"\nScegli opzione (1-{max_val}) o 0 per {label_zero}: "
     elif max_val == 1:
-        prompt = f"\nScegli opzione (1) o 0 per Menu: "
+        prompt = f"\nScegli opzione (1) o 0 per {label_zero}: "
     else:
-        prompt = "\nNessuna opzione disponibile. Premi 0 per Menu: "
+        prompt = f"\nNessuna opzione disponibile. Premi 0 per {label_zero}: "
     
     return input(prompt).strip()
 

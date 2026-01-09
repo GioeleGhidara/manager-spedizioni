@@ -24,20 +24,21 @@ def _format_data(iso_date):
     except ValueError:
         return iso_date
 
-def _parse_indirizzo_xml(order_element):
-    sa = order_element.find(".//ns:ShippingAddress", EBAY_NS)
-    if sa is None: return None
+# --- NUOVA FUNZIONE HELPER (Riutilizzabile) ---
+def _parse_nodo_indirizzo(addr_node):
+    """Parsa un nodo AddressType (usato sia per ShippingAddress che per RegistrationAddress)."""
+    if addr_node is None: return None
     
-    def get_sa_field(tag):
-        el = sa.find(f"ns:{tag}", EBAY_NS)
+    def get_field(tag):
+        el = addr_node.find(f"ns:{tag}", EBAY_NS)
         return el.text if el is not None else ""
 
-    name = get_sa_field("Name")
-    street1 = get_sa_field("Street1")
-    street2 = get_sa_field("Street2")
-    city = get_sa_field("CityName")
-    zip_code = get_sa_field("PostalCode")
-    phone_raw = get_sa_field("Phone")
+    name = get_field("Name")
+    street1 = get_field("Street1")
+    street2 = get_field("Street2")
+    city = get_field("CityName")
+    zip_code = get_field("PostalCode")
+    phone_raw = get_field("Phone")
     
     full_address = street1
     if street2: full_address += f" {street2}"
@@ -49,6 +50,58 @@ def _parse_indirizzo_xml(order_element):
         "postalCode": zip_code,
         "phone": normalizza_telefono(phone_raw)
     }
+
+def _parse_indirizzo_xml(order_element):
+    """Wrapper per compatibilità con la logica esistente degli ordini."""
+    sa = order_element.find(".//ns:ShippingAddress", EBAY_NS)
+    return _parse_nodo_indirizzo(sa)
+
+# --- NUOVA FUNZIONE: RECUPERO MITTENTE ---
+@traccia
+def get_mittente_ebay():
+    """Scarica l'indirizzo di registrazione dell'account eBay (Mittente)."""
+    token = EBAY_XML_TOKEN
+    if not token: return None
+    
+    print("   ☁️  Recupero indirizzo mittente da eBay...")
+
+    xml_body = f"""<?xml version="1.0" encoding="utf-8"?>
+<GetUserRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <RequesterCredentials><eBayAuthToken>{token}</eBayAuthToken></RequesterCredentials>
+  <DetailLevel>ReturnAll</DetailLevel>
+</GetUserRequest>"""
+
+    headers = {
+        "X-EBAY-API-SITEID": "101",
+        "X-EBAY-API-COMPATIBILITY-LEVEL": "1131",
+        "X-EBAY-API-CALL-NAME": "GetUser",
+        "Content-Type": "text/xml"
+    }
+
+    session = get_robust_session()
+
+    try:
+        response = session.post(EBAY_XML_API_URL, data=xml_body, headers=headers, timeout=30)
+        response.raise_for_status()
+        
+        root = ET.fromstring(response.content)
+        
+        # Check Errori
+        ack = _find_text(root, "Ack")
+        if ack == "Failure":
+            log.errore("Errore GetUser (Mittente)")
+            return None
+
+        # Cerca l'indirizzo di registrazione dell'utente
+        reg_addr = root.find(".//ns:User/ns:RegistrationAddress", EBAY_NS)
+        if reg_addr is not None:
+            return _parse_nodo_indirizzo(reg_addr)
+            
+    except Exception as e:
+        log.errore(f"Errore recupero mittente eBay: {e}")
+        return None
+    
+    return None
 
 @traccia
 def scarica_lista_ordini(giorni_storico=30):
@@ -117,18 +170,15 @@ def scarica_lista_ordini(giorni_storico=30):
             shipped_fmt = _format_data(shipped_time) if shipped_time else "-"
             delivered_fmt = _format_data(delivery_time) if delivery_time else "-"
 
-            # --- ESTRAZIONE TRACKING UNIVERSALE (METODO DEBUG [3]) ---
+            # --- ESTRAZIONE TRACKING UNIVERSALE ---
             tracking_code = "N.D."
-            # Questa riga cerca il tag ShipmentTrackingNumber ovunque nell'ordine,
-            # esattamente come ha fatto il tuo script di debug con successo.
             track_nodes = order.findall(".//ns:ShipmentTrackingNumber", EBAY_NS)
-            
             if track_nodes:
                 for node in track_nodes:
-                    if node.text and len(node.text.strip()) > 5: # Filtro rumore
+                    if node.text and len(node.text.strip()) > 5:
                         tracking_code = node.text.strip()
                         break
-            # ---------------------------------------------------------
+            # --------------------------------------
 
             titolo = "Oggetto eBay"
             try:
