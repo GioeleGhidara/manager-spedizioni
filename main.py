@@ -56,8 +56,9 @@ def main():
         ui.stampa_header()
         
         # Info stato cache (Mostra all'utente se i dati sono "freschi" o in memoria)
-        if service.get_cache_last_update():
-            ora_str = service.get_cache_last_update().strftime('%H:%M:%S')
+        cache_ts = service.get_cache_last_update()
+        if cache_ts:
+            ora_str = cache_ts.strftime('%H:%M:%S')
             print(f"⚡ Dati in memoria (Aggiornati alle {ora_str})")
         
         ui.stampa_menu_principale()
@@ -76,9 +77,8 @@ def main():
 
         # --- OPZIONE 1: DASHBOARD COMPLETA (Overview) ---
         elif scelta == "1":
-            # LOGICA CACHE: Scarico solo se vuota
-            if not service.get_cache_last_update():
-                da_spedire, in_viaggio = service.carica_ordini_cached(30)
+            # LOGICA CACHE: usa la cache se presente, altrimenti scarica
+            da_spedire, in_viaggio = service.carica_ordini_cached(30)
 
             if not da_spedire and not in_viaggio:
                 ui.avviso_info("Nessun ordine attivo trovato.")
@@ -106,7 +106,8 @@ def main():
                         print(f"\nƒo. Selezionato: {titolo_oggetto}")
                         break
                     elif action["action"] == "tracking":
-                        print(f"\n🚚 Tracking: {action['tracking']}")
+                        tracking_link = genera_link_tracking(action["tracking"])
+                        print(f"\n🚚 Tracking: {tracking_link}")
                         input("Premi INVIO per tornare indietro...")
                         continue  
                     ui.avviso_errore("Numero non valido.")
@@ -117,9 +118,8 @@ def main():
 
         # --- OPZIONE 2: SPEDISCI DA LISTA (Selezione Rapida) ---
         elif scelta == "2":
-            # LOGICA CACHE: Scarico solo se vuota
-            if not service.get_cache_last_update():
-                da_spedire, _in_viaggio = service.carica_ordini_cached(30)
+            # LOGICA CACHE: usa la cache se presente, altrimenti scarica
+            da_spedire, _in_viaggio = service.carica_ordini_cached(30)
 
             if not da_spedire:
                 ui.avviso_info("Nessun ordine da evadere in memoria.")
