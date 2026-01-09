@@ -21,12 +21,12 @@ def stampa_header():
 
 def stampa_menu_principale():
     print("\nCosa vuoi fare?")
-    print("1) 📋 Dashboard Ordini (eBay)")
-    print("2) 📦 Spedisci da Lista (eBay)") 
-    print("3) 🚀 Etichetta rapida")
-    print("4) 🔍 Storico ShipItalia (PDF e API)")
-    print("5) 📒 Storico Locale (Dettagliato)")
-    print("0) ❌ Esci")
+    print("1) [EBAY] Dashboard Ordini (eBay)")
+    print("2) [EBAY] Spedisci da Lista (eBay)") 
+    print("3) [MANUALE] Etichetta rapida")
+    print("4) [SHIPITALIA] Storico ShipItalia (PDF e API)")
+    print("5) [LOCALE] Storico Locale (Dettagliato)")
+    print("0) Esci")
 
 # ------------------------------------
 
@@ -49,17 +49,17 @@ def stampa_dashboard_ebay(da_spedire, in_viaggio):
 
     # DA SPEDIRE
     if da_spedire:
-        print(" 🔴  DA SPEDIRE")
+        print("  [DA SPEDIRE]")
         for i, o in enumerate(da_spedire):
             print(f" {i+1:<3} | {o['order_id'][:14]:<14} | {o['date']:<11} | {o['buyer']:<15} | {'DA SPEDIRE':<18} | {o['title']}")
     else:
-        print(" ✅  Tutto spedito!")
+        print(" [OK] Tutto spedito!")
 
     print("-" * 120)
 
     # IN VIAGGIO
     if in_viaggio:
-        print(" 🚚  IN VIAGGIO")
+        print("  [IN VIAGGIO]")
         start_idx = len(da_spedire) + 1
         for i, o in enumerate(in_viaggio):
             idx = start_idx + i
@@ -75,10 +75,10 @@ def stampa_lista_selezione_ebay(da_spedire):
     Stampa una tabella semplificata solo per la selezione 'Da Spedire'.
     """
     if not da_spedire:
-        print("\n✅ Nessun ordine in attesa di spedizione.")
+        print("\n[INFO] Nessun ordine in attesa di spedizione.")
         return
 
-    print(f"\n📦 TROVATI {len(da_spedire)} ORDINI DA EVADERE:")
+    print(f"\n[INFO] Trovati {len(da_spedire)} ordini da evadere:")
     print("=" * 100)
     print(f" {'#':<3} | {'DATA':<11} | {'UTENTE':<15} | {'TITOLO OGGETTO'}")
     print("=" * 100)
@@ -100,7 +100,7 @@ def stampa_storico_api(lista):
         trk = sped.get("trackingCode", "N.D.")
         raw_date = sped.get("createdAt", "")[:16].replace("T", " ")
         stato = sped.get("status", "N.D.")
-        has_pdf = "📥 Si" if sped.get("labelUrl") else "   No"
+        has_pdf = "SI" if sped.get("labelUrl") else "NO"
         
         print(f" {i+1:<3} | {trk:<15} | {raw_date:<16} | {stato:<12} | {has_pdf}")
 
@@ -112,7 +112,7 @@ def stampa_dettaglio_spedizione(idx, spedizione):
     trk = spedizione.get("trackingCode")
     pdf_url = spedizione.get("labelUrl", "Non disponibile")
     url_poste = genera_link_tracking(trk)
-    print(f"\n📦 DETTAGLI SPEDIZIONE #{idx+1}")
+    print(f"\nDETTAGLI SPEDIZIONE #{idx+1}")
     print(f"   Tracking:    {url_poste}")
     print(f"   Scarica PDF: {pdf_url}")
     print("\n(Copia il link o usa CTRL+Click se supportato)")
@@ -133,14 +133,14 @@ def stampa_storico_locale(storico):
 # ------------------------------------
 
 def messaggio_uscita():
-    print("👋 Alla prossima!")
+    print("A presto!")
 
 # ------------------------------------
 
 def avviso_errore(msg):
-    print(f"❌ {msg}")
+    print(f"[ERROR] {msg}")
 
 # ------------------------------------
 
 def avviso_info(msg):
-    print(f"ℹ️  {msg}")
+    print(f"[INFO] {msg}")

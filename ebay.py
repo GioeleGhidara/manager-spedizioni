@@ -4,15 +4,23 @@ from xml.sax.saxutils import escape
 from datetime import datetime
 from logger import log, traccia
 from utils import normalizza_telefono, get_robust_session
-from config import EBAY_XML_TOKEN, EBAY_XML_API_URL, EBAY_NS
+from config import (
+    EBAY_XML_TOKEN,
+    EBAY_XML_API_URL,
+    EBAY_NS,
+    EBAY_SITE_ID,
+    EBAY_COMPATIBILITY_LEVEL,
+)
 
 def _find_text(root, tag_name):
-    if root is None: return ""
+    if root is None:
+        return ""
     element = root.find(f".//ns:{tag_name}", EBAY_NS)
     return element.text if element is not None else ""
 
 def _format_data(iso_date):
-    if not iso_date: return "??"
+    if not iso_date:
+        return "??"
     try:
         clean_date = iso_date.replace("Z", "+00:00")
         if "." in clean_date:
@@ -24,11 +32,12 @@ def _format_data(iso_date):
     except ValueError:
         return iso_date
 
-# --- NUOVA FUNZIONE HELPER (Riutilizzabile) ---
+# --- FUNZIONE HELPER (Riutilizzabile) ---
 def _parse_nodo_indirizzo(addr_node):
     """Parsa un nodo AddressType (usato sia per ShippingAddress che per RegistrationAddress)."""
-    if addr_node is None: return None
-    
+    if addr_node is None:
+        return None
+
     def get_field(tag):
         el = addr_node.find(f"ns:{tag}", EBAY_NS)
         return el.text if el is not None else ""
@@ -39,10 +48,11 @@ def _parse_nodo_indirizzo(addr_node):
     city = get_field("CityName")
     zip_code = get_field("PostalCode")
     phone_raw = get_field("Phone")
-    
+
     full_address = street1
-    if street2: full_address += f" {street2}"
-        
+    if street2:
+        full_address += f" {street2}"
+
     return {
         "name": name,
         "address": full_address,
@@ -52,18 +62,19 @@ def _parse_nodo_indirizzo(addr_node):
     }
 
 def _parse_indirizzo_xml(order_element):
-    """Wrapper per compatibilità con la logica esistente degli ordini."""
+    """Wrapper per compatibilita con la logica esistente degli ordini."""
     sa = order_element.find(".//ns:ShippingAddress", EBAY_NS)
     return _parse_nodo_indirizzo(sa)
 
-# --- NUOVA FUNZIONE: RECUPERO MITTENTE ---
+# --- RECUPERO MITTENTE ---
 @traccia
 def get_mittente_ebay():
     """Scarica l'indirizzo di registrazione dell'account eBay (Mittente)."""
     token = EBAY_XML_TOKEN
-    if not token: return None
-    
-    print("   ☁️  Recupero indirizzo mittente da eBay...")
+    if not token:
+        return None
+
+    print("   [INFO] Recupero indirizzo mittente da eBay...")
 
     xml_body = f"""<?xml version="1.0" encoding="utf-8"?>
 <GetUserRequest xmlns="urn:ebay:apis:eBLBaseComponents">
@@ -72,8 +83,8 @@ def get_mittente_ebay():
 </GetUserRequest>"""
 
     headers = {
-        "X-EBAY-API-SITEID": "101",
-        "X-EBAY-API-COMPATIBILITY-LEVEL": "1131",
+        "X-EBAY-API-SITEID": EBAY_SITE_ID,
+        "X-EBAY-API-COMPATIBILITY-LEVEL": EBAY_COMPATIBILITY_LEVEL,
         "X-EBAY-API-CALL-NAME": "GetUser",
         "Content-Type": "text/xml"
     }
@@ -83,10 +94,10 @@ def get_mittente_ebay():
     try:
         response = session.post(EBAY_XML_API_URL, data=xml_body, headers=headers, timeout=30)
         response.raise_for_status()
-        
+
         root = ET.fromstring(response.content)
-        
-        # Check Errori
+
+        # Check errori
         ack = _find_text(root, "Ack")
         if ack == "Failure":
             log.errore("Errore GetUser (Mittente)")
@@ -96,11 +107,11 @@ def get_mittente_ebay():
         reg_addr = root.find(".//ns:User/ns:RegistrationAddress", EBAY_NS)
         if reg_addr is not None:
             return _parse_nodo_indirizzo(reg_addr)
-            
+
     except Exception as e:
         log.errore(f"Errore recupero mittente eBay: {e}")
         return None
-    
+
     return None
 
 @traccia
@@ -111,10 +122,10 @@ def scarica_lista_ordini(giorni_storico=30):
     token = EBAY_XML_TOKEN
     if not token:
         log.errore("Token XML eBay mancante")
-        print("⚠️ Manca token XML.")
+        print("[WARN] Manca token XML.")
         return [], []
 
-    print(f"   ☁️  Scarico ordini eBay (Ultimi {giorni_storico} gg)...")
+    print(f"   [INFO] Scarico ordini eBay (Ultimi {giorni_storico} gg)...")
 
     xml_body = f"""<?xml version="1.0" encoding="utf-8"?>
 <GetOrdersRequest xmlns="urn:ebay:apis:eBLBaseComponents">
@@ -125,8 +136,8 @@ def scarica_lista_ordini(giorni_storico=30):
 </GetOrdersRequest>"""
 
     headers = {
-        "X-EBAY-API-SITEID": "101",
-        "X-EBAY-API-COMPATIBILITY-LEVEL": "1131",
+        "X-EBAY-API-SITEID": EBAY_SITE_ID,
+        "X-EBAY-API-COMPATIBILITY-LEVEL": EBAY_COMPATIBILITY_LEVEL,
         "X-EBAY-API-CALL-NAME": "GetOrders",
         "Content-Type": "text/xml"
     }
@@ -136,7 +147,7 @@ def scarica_lista_ordini(giorni_storico=30):
     try:
         response = session.post(EBAY_XML_API_URL, data=xml_body, headers=headers, timeout=30)
         response.raise_for_status()
-        
+
         try:
             root = ET.fromstring(response.content)
         except ET.ParseError as e:
@@ -147,30 +158,30 @@ def scarica_lista_ordini(giorni_storico=30):
         if ack == "Failure":
             error_msg = _find_text(root, "LongMessage")
             log.errore(f"Errore API eBay: {error_msg}")
-            print(f"❌ Errore API eBay: {error_msg[:100]}...")
+            print(f"[ERROR] Errore API eBay: {error_msg[:100]}...")
             return [], []
 
         orders = root.findall(".//ns:Order", EBAY_NS) or []
-        
+
         for order in orders:
             order_id = _find_text(order, "OrderID")
             status = _find_text(order, "OrderStatus")
-            
+
             if status in ["Cancelled", "Inactive"]:
                 continue
 
             paid_time = _find_text(order, "PaidTime")
             if not paid_time:
-                continue 
+                continue
 
             shipped_time = _find_text(order, "ShippedTime")
             delivery_time = _find_text(order, "ActualDeliveryTime")
-            
+
             created_fmt = _format_data(_find_text(order, "CreatedTime"))
             shipped_fmt = _format_data(shipped_time) if shipped_time else "-"
             delivered_fmt = _format_data(delivery_time) if delivery_time else "-"
 
-            # --- ESTRAZIONE TRACKING UNIVERSALE ---
+            # Estrazione tracking
             tracking_code = "N.D."
             track_nodes = order.findall(".//ns:ShipmentTrackingNumber", EBAY_NS)
             if track_nodes:
@@ -178,17 +189,18 @@ def scarica_lista_ordini(giorni_storico=30):
                     if node.text and len(node.text.strip()) > 5:
                         tracking_code = node.text.strip()
                         break
-            # --------------------------------------
 
             titolo = "Oggetto eBay"
             try:
                 t_node = order.find(".//ns:Item/ns:Title", EBAY_NS)
-                if t_node is not None: titolo = t_node.text
-            except: pass
+                if t_node is not None:
+                    titolo = t_node.text
+            except Exception:
+                pass
 
             titolo_corto = (titolo[:40] + '..') if len(titolo) > 40 else titolo
             destinatario = _parse_indirizzo_xml(order)
-            
+
             if order_id and destinatario:
                 obj_ordine = {
                     "order_id": order_id,
@@ -199,7 +211,7 @@ def scarica_lista_ordini(giorni_storico=30):
                     "shipped_at": shipped_fmt,
                     "delivered_at": delivered_fmt,
                     "amount": _find_text(order, "AmountPaid"),
-                    "tracking": tracking_code 
+                    "tracking": tracking_code
                 }
 
                 if not shipped_time:
@@ -214,31 +226,32 @@ def scarica_lista_ordini(giorni_storico=30):
 
     except Exception as e:
         log.errore(f"Errore durante scaricamento ordini: {e}")
-        print(f"⚠️ Errore ricerca: {e}")
+        print(f"[WARN] Errore ricerca: {e}")
         return [], []
 
 @traccia
 def gestisci_ordine_ebay(order_id, tracking):
-    carrier = "Poste Italiane" 
+    carrier = "Poste Italiane"
     try:
         invia_tracking_xml(order_id, tracking, carrier)
-        print("✅ Tracking caricato su eBay (XML).")
+        print("[OK] Tracking caricato su eBay (XML).")
         log.successo(f"eBay aggiornato per {order_id} -> {tracking}")
     except Exception as e:
         log.errore(f"Fallimento aggiornamento eBay per {order_id}: {e}")
-        print(f"⚠️ Errore aggiornamento eBay: {e}")
+        print(f"[WARN] Errore aggiornamento eBay: {e}")
 
 @traccia
 def invia_tracking_xml(order_id, tracking, carrier):
     token = EBAY_XML_TOKEN
-    if not token: raise RuntimeError("Manca EBAY_XML_TOKEN.")
-    
+    if not token:
+        raise RuntimeError("Manca EBAY_XML_TOKEN.")
+
     order_id_clean = order_id.strip().replace(" ", "")
     session = get_robust_session()
-    
+
     tracking_safe = escape(tracking)
     carrier_safe = escape(carrier)
-    
+
     xml_body = f"""<?xml version="1.0" encoding="utf-8"?>
 <CompleteSaleRequest xmlns="urn:ebay:apis:eBLBaseComponents">
   <RequesterCredentials><eBayAuthToken>{token}</eBayAuthToken></RequesterCredentials>
@@ -251,28 +264,28 @@ def invia_tracking_xml(order_id, tracking, carrier):
     </ShipmentTrackingDetails>
   </Shipment>
 </CompleteSaleRequest>"""
-    
+
     headers = {
-        "X-EBAY-API-SITEID": "101",
-        "X-EBAY-API-COMPATIBILITY-LEVEL": "1131",
+        "X-EBAY-API-SITEID": EBAY_SITE_ID,
+        "X-EBAY-API-COMPATIBILITY-LEVEL": EBAY_COMPATIBILITY_LEVEL,
         "X-EBAY-API-CALL-NAME": "CompleteSale",
         "Content-Type": "text/xml",
     }
-    
-    print(f"   ☁️  Invio tracking a eBay ({order_id_clean})...")
+
+    print(f"   [INFO] Invio tracking a eBay ({order_id_clean})...")
     response = session.post(EBAY_XML_API_URL, data=xml_body, headers=headers, timeout=30)
     response.raise_for_status()
-    
+
     try:
         root = ET.fromstring(response.content)
         ack = _find_text(root, "Ack")
-        
+
         if ack == "Failure":
             err_long = _find_text(root, "LongMessage")
             err_short = _find_text(root, "ShortMessage")
             full_err = f"{err_short} - {err_long}".strip(" -")
             raise ValueError(f"eBay Failure: {full_err}")
-            
+
     except ET.ParseError:
         if response.status_code >= 400:
             raise ValueError(f"Risposta eBay non valida (HTTP {response.status_code})")

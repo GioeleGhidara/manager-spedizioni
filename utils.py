@@ -5,6 +5,8 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from config import HTTP_RETRIES, HTTP_BACKOFF_FACTOR
 
+_SESSION = None
+
 def get_robust_session():
     """
     Crea una requests.Session con retry/backoff robusti.
@@ -13,6 +15,10 @@ def get_robust_session():
     - include retry anche su POST (utile per API esterne che possono rispondere 5xx/429)
     - rispetta Retry-After quando presente
     """
+    global _SESSION
+    if _SESSION is not None:
+        return _SESSION
+
     session = requests.Session()
     retry_kwargs = dict(
         total=HTTP_RETRIES,
@@ -27,13 +33,14 @@ def get_robust_session():
     try:
         retry = Retry(**retry_kwargs, allowed_methods=allowed)
     except TypeError:
-        # Compatibilità con urllib3 < 2 (parametro rinominato)
+        # Compatibilita con urllib3 < 2 (parametro rinominato)
         retry = Retry(**retry_kwargs, method_whitelist=allowed)
 
     adapter = HTTPAdapter(max_retries=retry)
     session.mount("http://", adapter)
     session.mount("https://", adapter)
-    return session
+    _SESSION = session
+    return _SESSION
 
 def arrotonda_peso_per_eccesso(peso: float) -> float:
     if peso <= 0:
@@ -57,7 +64,7 @@ def valido_order_id(order_id: str) -> bool:
     Accetta sia il formato Legacy (12-12345-12345) 
     sia il formato REST API (v1|...|0).
     """
-    # Se contiene pipe | è sicuramente un ID tecnico REST
+    # Se contiene pipe | e sicuramente un ID tecnico REST
     if "|" in order_id:
         return True
     
