@@ -95,7 +95,7 @@ def main():
                     skip_creazione = True
                     break
                 
-                                try:
+                try:
                     idx = int(sel)
                     action = service.resolve_lista_spedire(da_spedire, idx)
                     if action["action"] == "order":
