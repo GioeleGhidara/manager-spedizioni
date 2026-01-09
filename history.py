@@ -14,7 +14,7 @@ def salva_in_storico(tipo, destinatario, tracking, order_id=None, titolo=None):
         try:
             with open(FILE_STORICO, "r", encoding="utf-8") as f:
                 lista = json.load(f)
-        except Exception:
+        except:
             lista = []
 
     # 2. Prepara il nuovo oggetto
@@ -36,7 +36,7 @@ def salva_in_storico(tipo, destinatario, tracking, order_id=None, titolo=None):
             json.dump(lista[:500], f, indent=4, ensure_ascii=False)
         return True
     except Exception as e:
-        print(f"[WARN] Errore salvataggio storico locale: {e}")
+        print(f"⚠️ Errore salvataggio storico locale: {e}")
         return False
 
 def leggi_storico_locale():
@@ -46,5 +46,5 @@ def leggi_storico_locale():
     try:
         with open(FILE_STORICO, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except:
         return []

@@ -34,14 +34,14 @@ def safe_repr(obj):
         return "***"
 
 # --- CONFIGURAZIONE ---
-K = 30                  # I log piu vecchi di questi giorni verranno cancellati
+K = 30                  # I log più vecchi di questi giorni verranno cancellati
 CARTELLA_LOG = "logs"   # Nome della cartella
 
 class GestoreLog:
     def __init__(self, cartella_output=CARTELLA_LOG, giorni_conservazione=K):
         self.cartella = cartella_output
         self.giorni_conservazione = giorni_conservazione
-
+        
         # 1. Crea la cartella se non esiste
         if not os.path.exists(self.cartella):
             try:
@@ -54,12 +54,12 @@ class GestoreLog:
         self._pulizia_automatica()
 
     def _pulizia_automatica(self):
-        # Elimina i file .txt piu vecchi di K giorni
+        #Elimina i file .txt più vecchi di K giorni
         try:
             adesso = time.time()
-            limite_tempo = adesso - (self.giorni_conservazione * 86400)  # 86400 sec = 1 giorno
+            limite_tempo = adesso - (self.giorni_conservazione * 86400) # 86400 sec = 1 giorno
             count = 0
-
+            
             if os.path.exists(self.cartella):
                 for nome_file in os.listdir(self.cartella):
                     percorso = os.path.join(self.cartella, nome_file)
@@ -74,40 +74,32 @@ class GestoreLog:
             print(f"[Sistema] Errore pulizia log: {e}")
 
     def _scrivi(self, livello, icona, messaggio):
-        # Scrive fisicamente nel file giornaliero.
+        #Scrive fisicamente nel file giornaliero.
         adesso = datetime.now()
         # Nome file rotativo: log_YYYY-mm-dd.txt
         nome_file = f"log_{adesso.strftime('%Y-%m-%d')}.txt"
         percorso = os.path.join(self.cartella, nome_file)
-
+        
         # Formato: [ORA] | ICONA LIVELLO | MESSAGGIO
         riga = f"[{adesso.strftime('%H:%M:%S')}] | {icona} {livello:<7} | {messaggio}\n"
 
         try:
             with open(percorso, "a", encoding="utf-8") as f:
                 f.write(riga)
-            # print(riga.strip())  # Togliere # per visualizzare a schermo i log
+            # print(riga.strip()) ## Togliere # per visualizzare a schermo i log
         except Exception as e:
             print(f"!!! Errore scrittura log: {e}")
 
     # --- Metodi rapidi ---
-    def info(self, msg):
-        self._scrivi("INFO", "[INFO] ", msg)
-
-    def successo(self, msg):
-        self._scrivi("OK", "[OK] ", msg)
-
-    def errore(self, msg):
-        self._scrivi("ERROR", "[ERROR] ", msg)
-
-    def warning(self, msg):
-        self._scrivi("WARN", "[WARN] ", msg)
-
-    def debug(self, msg):
-        self._scrivi("DEBUG", "[DEBUG] ", msg)
+    def info(self, msg):    self._scrivi("INFO", "ℹ️ ", msg)
+    def successo(self, msg): self._scrivi("OK", "✅ ", msg)
+    def errore(self, msg):   self._scrivi("ERROR", "❌ ", msg)
+    def warning(self, msg):  self._scrivi("WARN", "⚠️ ", msg)
+    def debug(self, msg):    self._scrivi("DEBUG", "🔍 ", msg)
 
 # --- INIZIALIZZAZIONE ---
 log = GestoreLog()
+
 
 # --- IL DECORATORE PER TRACCIARE LE FUNZIONI ---
 def traccia(func):
@@ -118,14 +110,14 @@ def traccia(func):
     def wrapper(*args, **kwargs):
         nome_func = func.__name__
         # Log Input
-        log.debug(f"START: {nome_func} | Input: {safe_repr(args)} {safe_repr(kwargs)}")
+        log.debug(f"▶️ START: {nome_func} | Input: {safe_repr(args)} {safe_repr(kwargs)}")
 
         try:
             risultato = func(*args, **kwargs)
-
-            # Log Output (intelligente)
+            
+            # --- NOVITÀ: Log Output (intelligente) ---
             out_log = str(risultato)
-            # Se e troppo lungo (es. file binario o lista enorme), lo tagliamo
+            # Se è troppo lungo (es. file binario o lista enorme), lo tagliamo
             if len(out_log) > 100:
                 if isinstance(risultato, list):
                     out_log = f"Lista di {len(risultato)} elementi"
@@ -133,21 +125,22 @@ def traccia(func):
                     out_log = f"Dizionario con {len(risultato)} chiavi"
                 else:
                     out_log = out_log[:100] + "..."
-
-            log.debug(f"END: {nome_func} | Output: {out_log}")
+            
+            log.debug(f"⏹️ END:   {nome_func} | Output: {out_log}")
             return risultato
-
+            
         except Exception as e:
-            log.errore(f"CRASH: {nome_func} fallita. Motivo: {e}")
-            raise
+            log.errore(f"💥 CRASH: {nome_func} fallita! Motivo: {e}")
+            raise e 
     return wrapper
 
 if __name__ == "__main__":
+    
     # 1. Esempio: Una funzione normale che fa una richiesta (simulata)
     @traccia
     def scarica_ordini_ebay(stato_ordine):
         log.info("Contattando il server eBay...")
-        time.sleep(1)  # Simula attesa
+        time.sleep(1) # Simula attesa
         return ["Ordine #123", "Ordine #456"]
 
     # 2. Esempio: Una funzione che accetta dati e calcola qualcosa
@@ -165,10 +158,10 @@ if __name__ == "__main__":
         ordini = scarica_ordini_ebay("DA_SPEDIRE")
         log.info(f"Ho trovato {len(ordini)} ordini.")
 
-        # Chiamata tracciata che andra in ERRORE (simulato)
+        # Chiamata tracciata che andrà in ERRORE (simulato)
         costo = calcola_costo_spedizione(150, corriere="Poste")
 
-    except Exception:
-        log.warning("Il programma ha gestito un errore ed e andato avanti.")
+    except Exception as e:
+        log.warning("Il programma ha gestito un errore ed è andato avanti.")
 
     log.successo("Programma terminato.")

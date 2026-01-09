@@ -4,8 +4,7 @@ from utils import get_robust_session
 from logger import log, traccia
 from config import (
     EBAY_XML_TOKEN, EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID,
-    EBAY_XML_API_URL, EBAY_NS,
-    EBAY_SITE_ID, EBAY_COMPATIBILITY_LEVEL,
+    EBAY_XML_API_URL, EBAY_NS
 )
 
 @traccia
@@ -26,8 +25,8 @@ def check_scadenza_token_silenzioso():
     </GetTokenStatusRequest>"""
 
     headers = {
-        "X-EBAY-API-SITEID": EBAY_SITE_ID,
-        "X-EBAY-API-COMPATIBILITY-LEVEL": EBAY_COMPATIBILITY_LEVEL,
+        "X-EBAY-API-SITEID": "101",
+        "X-EBAY-API-COMPATIBILITY-LEVEL": "1131",
         "X-EBAY-API-CALL-NAME": "GetTokenStatus",
         "X-EBAY-API-APP-NAME": EBAY_APP_ID,
         "X-EBAY-API-DEV-NAME": EBAY_DEV_ID,
@@ -37,16 +36,18 @@ def check_scadenza_token_silenzioso():
 
     try:
         session = get_robust_session()
+        # QUI: Usiamo la costante EBAY_XML_API_URL invece dell'URL scritto a mano
         response = session.post(EBAY_XML_API_URL, data=xml_body, headers=headers, timeout=5)
-
+        
         if response.status_code == 200:
             root = ET.fromstring(response.content)
-
+            
+            # QUI: Usiamo EBAY_NS importato invece di ridefinire {'ns': ...}
             nodi_data = [
                 root.find(".//ns:HardExpirationTime", EBAY_NS),
                 root.find(".//ns:ExpirationTime", EBAY_NS)
             ]
-
+            
             data_str = next((n.text for n in nodi_data if n is not None), None)
 
             if data_str:
@@ -56,15 +57,15 @@ def check_scadenza_token_silenzioso():
                 giorni = delta.days
 
                 if giorni < 0:
-                    return f"ERROR: TOKEN EBAY SCADUTO DA {abs(giorni)} GIORNI. Rigeneralo subito."
+                    return f"❌ IL TOKEN EBAY È SCADUTO DA {abs(giorni)} GIORNI! Rigeneralo subito."
                 elif giorni < 60:
-                    return f"WARN: Il token eBay scade tra {giorni} giorni ({scadenza.strftime('%d/%m/%Y')})."
-
+                    return f"⚠️  ATTENZIONE: Il token eBay scade tra {giorni} giorni ({scadenza.strftime('%d/%m/%Y')})."
+                
                 log.info(f"Check Token OK: scade tra {giorni} gg.")
                 return None
 
     except Exception as e:
         log.warning(f"Check token avvio fallito (ignorato): {e}")
         return None
-
+        
     return None

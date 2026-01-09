@@ -10,13 +10,13 @@ def chiedi_peso() -> float:
             valore = input("Peso (kg): ").replace(",", ".")
             return arrotonda_peso_per_eccesso(float(valore))
         except ValueError as e:
-            print(f"[ERROR] Errore peso: {e}")
+            print(f"❌ Errore peso: {e}")
 
 def chiedi_codice_sconto() -> str:
     """Chiede un codice sconto opzionale."""
     codice = input("Codice Sconto (INVIO per nessuno): ").strip().upper()
     if codice:
-        print(f"   [INFO] Codice inserito: {codice}")
+        print(f"   🎟️  Codice inserito: {codice}")
     return codice
 
 def parse_indirizzo_blocco(testo: str):
@@ -29,7 +29,7 @@ def parse_indirizzo_blocco(testo: str):
 
     righe = [r.strip() for r in testo.splitlines() if r.strip()]
     if len(righe) < 2:
-        raise ValueError("Indirizzo troppo breve (servono almeno Nome e Via/Citta)")
+        raise ValueError("Indirizzo troppo breve (servono almeno Nome e Via/Città)")
 
     idx_cap = -1
     dati_citta = {}
@@ -41,7 +41,7 @@ def parse_indirizzo_blocco(testo: str):
             idx_cap = i
             dati_citta = {"postalCode": m.group(1), "city": m.group(2).strip().lstrip(",").strip()}
             break
-
+    
     if idx_cap == -1:
         raise ValueError("Non riesco a trovare una riga con CAP valido (5 cifre)")
 
@@ -64,13 +64,13 @@ def parse_indirizzo_blocco(testo: str):
 
     # 3. Analizza Parte Inferiore (Telefono)
     telefono = ""
-    parte_inferiore = righe[idx_cap + 1:]
-
+    parte_inferiore = righe[idx_cap+1:]
+    
     for riga in parte_inferiore:
         conteggio_numeri = sum(c.isdigit() for c in riga)
         if conteggio_numeri >= 6:
             telefono = normalizza_telefono(riga)
-            break
+            break 
 
     return {
         "name": nome,
@@ -86,7 +86,7 @@ def chiedi_indirizzo_guidato():
         "name": input("   Nome: ").strip(),
         "address": input("   Via: ").strip(),
         "postalCode": input("   CAP: ").strip(),
-        "city": input("   Citta: ").strip(),
+        "city": input("   Città: ").strip(),
         "phone": normalizza_telefono(input("   Telefono: ").strip()),
     }
 
@@ -113,29 +113,29 @@ def chiedi_destinatario():
             else:
                 print("Scelta non valida.")
         except Exception as e:
-            print(f"[ERROR] Errore nell'inserimento: {e}")
+            print(f"❌ Errore nell'inserimento: {e}")
 
 def carica_mittente():
     """Scarica mittente da eBay (o fallback manuale)."""
     print("\n--- MITTENTE ---")
-
+    
     # Tentativo automatico eBay
     mittente_ebay = get_mittente_ebay()
-
+    
     if mittente_ebay:
         # Mostriamo l'indirizzo trovato per conferma
-        print("[OK] Indirizzo recuperato da eBay:")
+        print("✅ Indirizzo recuperato da eBay:")
         print(f"   {mittente_ebay.get('name', 'N.D.')}")
         print(f"   {mittente_ebay.get('address', '')}")
         print(f"   {mittente_ebay.get('postalCode', '')} {mittente_ebay.get('city', '')}")
-
+        
         scelta = input("\nVuoi usare questo mittente? (S/N): ").strip().lower()
         if scelta != 'n':
             return mittente_ebay
     else:
-        print("[WARN] Impossibile recuperare indirizzo da eBay (o richiesta fallita).")
+        print("⚠️  Impossibile recuperare indirizzo da eBay (o richiesta fallita).")
 
-    print("[INFO] Passiamo all'inserimento manuale.")
+    print("⚠️  Passiamo all'inserimento manuale.")
     return chiedi_indirizzo_guidato()
 
 # --- FUNZIONI DI OUTPUT (UI) & MODIFICA ---
@@ -143,20 +143,20 @@ def carica_mittente():
 def stampa_riepilogo(payload, order_id):
     m = payload['sender']
     d = payload['recipient']
-    W = 35
+    W = 35 
 
     print("\n" + "=" * (W * 2 + 3))
-    print(f"{' MITTENTE':<{W}} | {' DESTINATARIO':<{W}}")
+    print(f"{' 📤 MITTENTE':<{W}} | {' 📥 DESTINATARIO':<{W}}")
     print("-" * (W * 2 + 3))
 
-    nom_m = m.get('name', 'N.D.')[:W - 1]
-    nom_d = d.get('name', 'N.D.')[:W - 1]
-    ind_m = m.get('address', '')[:W - 1]
-    ind_d = d.get('address', '')[:W - 1]
-    cit_m = f"{m.get('postalCode', '')} {m.get('city', '')}"[:W - 1]
-    cit_d = f"{d.get('postalCode', '')} {d.get('city', '')}"[:W - 1]
-    tel_d = d.get('phone', 'Nessuno')[:W - 1]
-    tel_m = m.get('phone', '')[:W - 1]
+    nom_m = m.get('name', 'N.D.')[:W-1]
+    nom_d = d.get('name', 'N.D.')[:W-1]
+    ind_m = m.get('address', '')[:W-1]
+    ind_d = d.get('address', '')[:W-1]
+    cit_m = f"{m.get('postalCode', '')} {m.get('city', '')}"[:W-1]
+    cit_d = f"{d.get('postalCode', '')} {d.get('city', '')}"[:W-1]
+    tel_d = d.get('phone', 'Nessuno')[:W-1]
+    tel_m = m.get('phone', '')[:W-1]
 
     print(f"{nom_m:<{W}} | {nom_d:<{W}}")
     print(f"{ind_m:<{W}} | {ind_d:<{W}}")
@@ -164,21 +164,21 @@ def stampa_riepilogo(payload, order_id):
     print(f"{tel_m:<{W}} | {tel_d:<{W}}")
 
     print("-" * (W * 2 + 3))
-    print(f" [INFO] PESO: {payload['weight']} kg")
-
-    # Mostriamo il codice sconto se c'e
+    print(f" ⚖️  PESO: {payload['weight']} kg")
+    
+    # Mostriamo il codice sconto se c'è
     if payload.get("discountCode"):
-        print(f" [INFO] SCONTO: {payload['discountCode']}")
+        print(f" 🎟️  SCONTO: {payload['discountCode']}")
 
     if order_id:
-        print(f" [EBAY] ATTIVO (Order ID: {order_id})")
+        print(f" 🔗 EBAY: ATTIVO (Order ID: {order_id})")
     else:
-        print(" [EBAY] DISATTIVO (Solo creazione PDF)")
-
+        print(f" 📄 EBAY: DISATTIVO (Solo creazione PDF)")
+        
     print("=" * (W * 2 + 3) + "\n")
 
 def conferma_operazione() -> bool:
-    # Ritorna True se l'utente accetta, False se vuole modificare.
+    #Ritorna True se l'utente accetta, False se vuole modificare.
     while True:
         risposta = input("Dati corretti? Confermi l'acquisto? (S/N): ").strip().lower()
         if risposta == "s":
@@ -187,33 +187,34 @@ def conferma_operazione() -> bool:
             return False
 
 def gestisci_modifiche(payload):
-    # Menu interattivo per modificare i dati in caso di errore.
-    print("\nMODIFICA DATI")
+    
+    #Menu interattivo per modificare i dati in caso di errore.
+    print("\n🔧 MODIFICA DATI")
     print("1) Modifica MITTENTE")
     print("2) Modifica DESTINATARIO")
     print("3) Modifica PESO")
-    print("4) Modifica CODICE SCONTO")
+    print("4) Modifica CODICE SCONTO") # Opzione nuova
     print("5) Annulla modifiche (torna al riepilogo)")
-
+    
     scelta = input("Cosa vuoi correggere? (1-5): ").strip()
-
+    
     if scelta == "1":
-        print("\n[INFO] Reinserisci MITTENTE:")
+        print("\n✏️  Reinserisci MITTENTE:")
         payload['sender'] = carica_mittente()
-
+    
     elif scelta == "2":
-        print("\n[INFO] Reinserisci DESTINATARIO:")
+        print("\n✏️  Reinserisci DESTINATARIO:")
         payload['recipient'] = chiedi_destinatario()
-
+    
     elif scelta == "3":
-        print("\n[INFO] Reinserisci PESO:")
+        print("\n⚖️  Reinserisci PESO:")
         payload['weight'] = chiedi_peso()
 
     elif scelta == "4":
-        print("\n[INFO] Reinserisci SCONTO:")
+        print("\n🎟️  Reinserisci SCONTO:")
         payload['discountCode'] = chiedi_codice_sconto()
-
+    
     elif scelta == "5":
         return
     else:
-        print("[ERROR] Scelta non valida.")
+        print("❌ Scelta non valida.")

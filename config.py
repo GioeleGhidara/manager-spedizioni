@@ -1,8 +1,8 @@
 import os
 from dotenv import load_dotenv
 
-# Carica il .env, ma NON sovrascrive se la variabile esiste gia nel sistema
-# (Cosi le Variabili d'Ambiente del PC vincono sul file .env)
+# Carica il .env, ma NON sovrascrive se la variabile esiste già nel sistema
+# (Così le Variabili d'Ambiente del PC vincono sul file .env)
 load_dotenv(override=False)
 
 # --- CONFIGURAZIONE RETE ---
@@ -10,11 +10,11 @@ HTTP_RETRIES = 3
 HTTP_BACKOFF_FACTOR = 1
 
 # --- VARIABILI D'AMBIENTE ---
-# os.getenv leggera indifferentemente dal Sistema o dal file .env
+# os.getenv leggerà indifferentemente dal Sistema o dal file .env
 SHIPITALIA_API_KEY = os.getenv("SHIPITALIA_API_KEY")
 EBAY_XML_TOKEN = os.getenv("EBAY_XML_TOKEN")
 
-# Chiavi Sviluppatore eBay (opzionali per l'uso base, necessarie per il check scadenza)
+# Chiavi Sviluppatore eBay (Opzionali per l'uso base, necessarie per il check scadenza)
 EBAY_APP_ID = os.getenv("EBAY_APP_ID")
 EBAY_DEV_ID = os.getenv("EBAY_DEV_ID")
 EBAY_CERT_ID = os.getenv("EBAY_CERT_ID")
@@ -25,8 +25,6 @@ MITTENTE_FILE = os.path.join("config", "mittente.txt")
 
 EBAY_XML_API_URL = "https://api.ebay.com/ws/api.dll"
 EBAY_NS = {'ns': 'urn:ebay:apis:eBLBaseComponents'}
-EBAY_SITE_ID = "101"
-EBAY_COMPATIBILITY_LEVEL = "1131"
 
 def validate_config():
     """
