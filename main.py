@@ -11,15 +11,11 @@ from check_token import check_scadenza_token_silenzioso
 # Nuova gestione UI
 import ui
 
+# Service layer
+from services import SpedizioniService
+
 # Logica (separata da I/O)
-from app_logic import (
-    CacheState,
-    set_cache,
-    get_cached_lists,
-    invalidate_cache,
-    resolve_dashboard_selection,
-    build_payload,
-)
+from app_logic import build_payload
 
 # Logica di business
 from input_utils import (
@@ -27,9 +23,10 @@ from input_utils import (
     chiedi_codice_sconto, stampa_riepilogo, 
     conferma_operazione, gestisci_modifiche
 )
-from shipitalia import genera_etichetta, get_lista_spedizioni, scarica_pdf
-from ebay import gestisci_ordine_ebay, scarica_lista_ordini
-from history import salva_in_storico, leggi_storico_locale
+import shipitalia
+import ebay
+import history
+from history import leggi_storico_locale
 
 def main():
     log.info("--- Avvio Applicazione ---")
@@ -52,16 +49,15 @@ def main():
             return
         time.sleep(3)
 
-    # --- MEMORIA CACHE (Evita chiamate API continue) ---
-    cache_state = CacheState()
+    service = SpedizioniService(ebay, shipitalia, history)
 
     # 2. Loop Principale
     while True:
         ui.stampa_header()
         
         # Info stato cache (Mostra all'utente se i dati sono "freschi" o in memoria)
-        if cache_state.last_update:
-            ora_str = cache_state.last_update.strftime('%H:%M:%S')
+        if service.get_cache_last_update():
+            ora_str = service.get_cache_last_update().strftime('%H:%M:%S')
             print(f"⚡ Dati in memoria (Aggiornati alle {ora_str})")
         
         ui.stampa_menu_principale()
@@ -81,12 +77,9 @@ def main():
         # --- OPZIONE 1: DASHBOARD COMPLETA (Overview) ---
         elif scelta == "1":
             # LOGICA CACHE: Scarico solo se vuota
-            if cache_state.ordini is None:
+            if not service.get_cache_last_update():
                 print("\n☁️  Scarico ordini da eBay...")
-                da_spedire, in_viaggio = scarica_lista_ordini(30)
-                set_cache(cache_state, da_spedire, in_viaggio)
-            else:
-                da_spedire, in_viaggio = get_cached_lists(cache_state)
+            da_spedire, in_viaggio = service.carica_ordini_cached(30)
 
             if not da_spedire and not in_viaggio:
                 ui.avviso_info("Nessun ordine attivo trovato.")
@@ -102,9 +95,9 @@ def main():
                     skip_creazione = True
                     break
                 
-                try:
+                                try:
                     idx = int(sel)
-                    action = resolve_dashboard_selection(da_spedire, in_viaggio, idx)
+                    action = service.resolve_lista_spedire(da_spedire, idx)
                     if action["action"] == "order":
                         ordine = action["order"]
                         order_id = ordine['order_id']
@@ -113,12 +106,6 @@ def main():
                         tipo_operazione = "EBAY"
                         print(f"\nƒo. Selezionato: {titolo_oggetto}")
                         break
-                    if action["action"] == "tracking":
-                        webbrowser.open(genera_link_tracking(action["tracking"]))
-                        continue
-                    if action["action"] == "tracking_unavailable":
-                        ui.avviso_errore("Tracking non disponibile.")
-                        continue
                     ui.avviso_errore("Numero non valido.")
                 except ValueError:
                     pass
@@ -128,13 +115,9 @@ def main():
         # --- OPZIONE 2: SPEDISCI DA LISTA (Selezione Rapida) ---
         elif scelta == "2":
             # LOGICA CACHE: Scarico solo se vuota
-            if cache_state.ordini is None:
+            if not service.get_cache_last_update():
                 print("\n☁️  Scarico ordini da spedire...")
-                da_spedire_raw, in_viaggio_raw = scarica_lista_ordini(30)
-                set_cache(cache_state, da_spedire_raw, in_viaggio_raw)
-                da_spedire = da_spedire_raw
-            else:
-                da_spedire, _in_viaggio = get_cached_lists(cache_state)
+            da_spedire, _in_viaggio = service.carica_ordini_cached(30)
 
             if not da_spedire:
                 ui.avviso_info("Nessun ordine da evadere in memoria.")
@@ -163,17 +146,18 @@ def main():
                     
                     try:
                         idx = int(sel)
-                        if 1 <= idx <= len(da_spedire):
-                            ordine = da_spedire[idx - 1]
+                        action = service.resolve_lista_spedire(da_spedire, idx)
+                        if action["action"] == "order":
+                            ordine = action["order"]
                             order_id = ordine['order_id']
                             destinatario_auto = ordine['destinatario']
                             titolo_oggetto = ordine['title']
                             tipo_operazione = "EBAY"
-                            print(f"\n✅ Selezionato: {titolo_oggetto}")
+                            print(f"\nƒo. Selezionato: {titolo_oggetto}")
                             break
-                        else:
-                            ui.avviso_errore("Numero non valido.")
-                    except ValueError: pass
+                        ui.avviso_errore("Numero non valido.")
+                    except ValueError:
+                        pass
                 
                 if skip_creazione: continue
 
@@ -186,7 +170,7 @@ def main():
         # --- STORICO API SHIPITALIA ---
         elif scelta == "4":
             print("\n   ☁️  Scarico dati...")
-            lista = get_lista_spedizioni(limit=15)
+            lista = service.lista_spedizioni(limit=15)
             if not lista:
                 ui.avviso_errore("Nessuna spedizione trovata.")
                 time.sleep(2)
@@ -198,12 +182,14 @@ def main():
                 sel = ui.chiedi_scelta_range(len(lista))
                 if sel == '0': break
                 try:
-                    idx = int(sel) - 1
-                    if 0 <= idx < len(lista):
-                        ui.stampa_dettaglio_spedizione(idx, lista[idx])
+                    idx = int(sel)
+                    action = service.resolve_storico_index(lista, idx)
+                    if action["action"] == "item":
+                        ui.stampa_dettaglio_spedizione(action["index"], action["item"])
                     else:
                         ui.avviso_errore("Numero non valido.")
-                except ValueError: pass
+                except ValueError:
+                    pass
             continue
 
         # --- STORICO LOCALE ---
@@ -240,13 +226,13 @@ def main():
                 gestisci_modifiche(payload)
 
             print("\n⏳ Generazione in corso...")
-            result = genera_etichetta(payload)
+            result = service.crea_etichetta(payload)
             tracking = result["trackingCode"]
 
             log.successo(f"Creata etichetta: {tracking}")
             print(f"✅ Etichetta creata: {tracking}")
 
-            salva_in_storico(
+            service.salva_storico(
                 tipo=tipo_operazione,
                 destinatario=destinatario.get("name", "N.D."),
                 tracking=tracking,
@@ -256,11 +242,11 @@ def main():
             print("💾 Salvato nello storico locale.")
 
             if order_id and valido_order_id(order_id):
-                gestisci_ordine_ebay(order_id, tracking)
+                service.aggiorna_tracking_ebay(order_id, tracking)
                 
                 # IMPORTANTE: Invalidiamo la cache dopo aver spedito un ordine eBay.
                 # Così al prossimo giro la lista si aggiorna e l'ordine sparisce.
-                invalidate_cache(cache_state)
+                service.invalida_cache()
                 print("🔄 Lista ordini invalidata per aggiornamento automatico.")
 
             elif order_id == "MANUALE":
