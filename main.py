@@ -31,7 +31,7 @@ def main():
         ui.avviso_errore(f"CONFIG ERROR: {e}")
         return
 
-    print("⏳ Avvio sistema...")
+    print("⏳ Controllo token...")
     avviso_token = check_scadenza_token_silenzioso()
     if avviso_token:
         print("\n" + "!" * 60)
@@ -42,12 +42,22 @@ def main():
             return
         time.sleep(3)
 
+    # --- MEMORIA CACHE (Evita chiamate API continue) ---
+    cache_ordini = None
+    last_update = None
+
     # 2. Loop Principale
     while True:
         ui.stampa_header()
+        
+        # Info stato cache (Mostra all'utente se i dati sono "freschi" o in memoria)
+        if last_update:
+            ora_str = last_update.strftime('%H:%M:%S')
+            print(f"⚡ Dati in memoria (Aggiornati alle {ora_str})")
+        
         ui.stampa_menu_principale()
         
-        # Menu fisso 5 opzioni
+        # Menu fisso 5 opzioni (Rimosso riferimento alla 9)
         scelta = ui.chiedi_scelta_range(5) 
         
         # Reset variabili per il nuovo giro
@@ -63,10 +73,18 @@ def main():
 
         # --- OPZIONE 1: DASHBOARD COMPLETA (Overview) ---
         elif scelta == "1":
-            da_spedire, in_viaggio = scarica_lista_ordini(30)
-            
+            # LOGICA CACHE: Scarico solo se vuota
+            if cache_ordini is None:
+                print("\n☁️  Scarico ordini da eBay...")
+                da_spedire, in_viaggio = scarica_lista_ordini(30)
+                cache_ordini = {"da_spedire": da_spedire, "in_viaggio": in_viaggio}
+                last_update = datetime.now()
+            else:
+                da_spedire = cache_ordini["da_spedire"]
+                in_viaggio = cache_ordini["in_viaggio"]
+
             if not da_spedire and not in_viaggio:
-                ui.avviso_info("Nessun ordine attivo.")
+                ui.avviso_info("Nessun ordine attivo trovato.")
                 input("\nPremi INVIO...")
                 continue
 
@@ -107,17 +125,23 @@ def main():
 
         # --- OPZIONE 2: SPEDISCI DA LISTA (Selezione Rapida) ---
         elif scelta == "2":
-            print("\n☁️  Scarico ordini da spedire...")
-            # Scarichiamo solo gli ordini, ignorando quelli in viaggio
-            da_spedire, _ = scarica_lista_ordini(30)
+            # LOGICA CACHE: Scarico solo se vuota
+            if cache_ordini is None:
+                print("\n☁️  Scarico ordini da spedire...")
+                da_spedire_raw, in_viaggio_raw = scarica_lista_ordini(30)
+                cache_ordini = {"da_spedire": da_spedire_raw, "in_viaggio": in_viaggio_raw}
+                last_update = datetime.now()
+                da_spedire = da_spedire_raw
+            else:
+                da_spedire = cache_ordini["da_spedire"]
 
             if not da_spedire:
-                ui.avviso_info("Nessun ordine da evadere trovato.")
+                ui.avviso_info("Nessun ordine da evadere in memoria.")
                 # Fallback: se non c'è nulla, offriamo l'inserimento manuale
                 risp = input("Vuoi inserire l'ID manualmente? (s/n): ").strip().lower()
                 if risp != 's':
                     continue
-                # Se dice SI, cade nel blocco di codice manuale qui sotto...
+                
                 input_ebay = input("Incolla Order ID eBay: ").strip()
                 if valido_order_id(input_ebay):
                     order_id = input_ebay
@@ -128,7 +152,6 @@ def main():
                     time.sleep(1)
                     continue
             else:
-                # Se ci sono ordini, mostriamo la lista di selezione
                 ui.stampa_lista_selezione_ebay(da_spedire)
                 
                 while True:
@@ -238,6 +261,13 @@ def main():
 
             if order_id and valido_order_id(order_id):
                 gestisci_ordine_ebay(order_id, tracking)
+                
+                # IMPORTANTE: Invalidiamo la cache dopo aver spedito un ordine eBay.
+                # Così al prossimo giro la lista si aggiorna e l'ordine sparisce.
+                cache_ordini = None 
+                last_update = None
+                print("🔄 Lista ordini invalidata per aggiornamento automatico.")
+
             elif order_id == "MANUALE":
                 print("ℹ️  Nessun aggiornamento eBay (Manuale).")
 
