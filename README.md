@@ -29,8 +29,6 @@ Un tool gestionale in Python per automatizzare le spedizioni con **ShipItalia** 
 ```bash
 spedizioni shipitalia/
 │
-├── config/                  # File di configurazione statica
-│
 ├── etichette/               # (Generata) Contiene i PDF scaricati
 │
 ├── logs/                    # (Generata) Contiene i log giornalieri
