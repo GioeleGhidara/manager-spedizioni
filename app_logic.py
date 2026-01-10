@@ -9,6 +9,12 @@ class CacheState:
     last_update: Optional[datetime] = None
 
 
+@dataclass
+class ListCacheState:
+    items: Optional[List[dict]] = None
+    last_update: Optional[datetime] = None
+
+
 def set_cache(state: CacheState, da_spedire: List[dict], in_viaggio: List[dict]) -> None:
     state.ordini = {"da_spedire": da_spedire, "in_viaggio": in_viaggio}
     state.last_update = datetime.now()
@@ -22,6 +28,20 @@ def get_cached_lists(state: CacheState) -> Tuple[List[dict], List[dict]]:
 
 def invalidate_cache(state: CacheState) -> None:
     state.ordini = None
+    state.last_update = None
+
+
+def set_list_cache(state: ListCacheState, items: List[dict]) -> None:
+    state.items = items
+    state.last_update = datetime.now()
+
+
+def get_cached_list(state: ListCacheState) -> List[dict]:
+    return state.items or []
+
+
+def invalidate_list_cache(state: ListCacheState) -> None:
+    state.items = None
     state.last_update = None
 
 

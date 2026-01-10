@@ -1,6 +1,8 @@
 import re
-from ebay import get_mittente_ebay
-from utils import normalizza_telefono, arrotonda_peso_per_eccesso
+import ebay
+import utils
+
+_MITTENTE_CACHE = None
 
 # --- FUNZIONI DI INPUT ---
 
@@ -8,7 +10,7 @@ def chiedi_peso() -> float:
     while True:
         try:
             valore = input("Peso (kg): ").replace(",", ".")
-            return arrotonda_peso_per_eccesso(float(valore))
+            return utils.arrotonda_peso_per_eccesso(float(valore))
         except ValueError as e:
             print(f"❌ Errore peso: {e}")
 
@@ -69,7 +71,7 @@ def parse_indirizzo_blocco(testo: str):
     for riga in parte_inferiore:
         conteggio_numeri = sum(c.isdigit() for c in riga)
         if conteggio_numeri >= 6:
-            telefono = normalizza_telefono(riga)
+            telefono = utils.normalizza_telefono(riga)
             break 
 
     return {
@@ -87,7 +89,7 @@ def chiedi_indirizzo_guidato():
         "address": input("   Via: ").strip(),
         "postalCode": input("   CAP: ").strip(),
         "city": input("   Città: ").strip(),
-        "phone": normalizza_telefono(input("   Telefono: ").strip()),
+        "phone": utils.normalizza_telefono(input("   Telefono: ").strip()),
     }
 
 def chiedi_indirizzo_libero():
@@ -117,10 +119,20 @@ def chiedi_destinatario():
 
 def carica_mittente():
     """Scarica mittente da eBay (o fallback manuale)."""
+    global _MITTENTE_CACHE
     print("\n--- MITTENTE ---")
+
+    if _MITTENTE_CACHE:
+        print("✓ Mittente in cache:")
+        print(f"   {_MITTENTE_CACHE.get('name', 'N.D.')}")
+        print(f"   {_MITTENTE_CACHE.get('address', '')}")
+        print(f"   {_MITTENTE_CACHE.get('postalCode', '')} {_MITTENTE_CACHE.get('city', '')}")
+        scelta = input("\nVuoi usare questo mittente? (S/N): ").strip().lower()
+        if scelta != 'n':
+            return _MITTENTE_CACHE
     
     # Tentativo automatico eBay
-    mittente_ebay = get_mittente_ebay()
+    mittente_ebay = ebay.get_mittente_ebay()
     
     if mittente_ebay:
         # Mostriamo l'indirizzo trovato per conferma
@@ -131,6 +143,7 @@ def carica_mittente():
         
         scelta = input("\nVuoi usare questo mittente? (S/N): ").strip().lower()
         if scelta != 'n':
+            _MITTENTE_CACHE = mittente_ebay
             return mittente_ebay
     else:
         print("⚠️  Impossibile recuperare indirizzo da eBay (o richiesta fallita).")

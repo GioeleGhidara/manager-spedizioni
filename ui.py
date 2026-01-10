@@ -1,6 +1,6 @@
 import os
 import sys
-from utils import genera_link_tracking
+import utils
 
 # Imposta encoding per Windows
 if hasattr(sys.stdout, 'reconfigure'):
@@ -111,7 +111,7 @@ def stampa_storico_api(lista):
 def stampa_dettaglio_spedizione(idx, spedizione):
     trk = spedizione.get("trackingCode")
     pdf_url = spedizione.get("labelUrl", "Non disponibile")
-    url_poste = genera_link_tracking(trk)
+    url_poste = utils.genera_link_tracking(trk)
     print(f"\n📦 DETTAGLI SPEDIZIONE #{idx+1}")
     print(f"   Tracking:    {url_poste}")
     print(f"   Scarica PDF: {pdf_url}")

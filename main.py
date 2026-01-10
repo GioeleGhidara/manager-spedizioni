@@ -1,45 +1,30 @@
 import time
-import webbrowser
 from datetime import datetime
 
-# Moduli interni
-from config import validate_config
-from logger import log
-from utils import valido_order_id, genera_link_tracking
-from check_token import check_scadenza_token_silenzioso
-
-# Nuova gestione UI
-import ui
-
-# Service layer
-from services import SpedizioniService
-
-# Logica (separata da I/O)
-from app_logic import build_payload
-
-# Logica di business
-from input_utils import (
-    chiedi_peso, carica_mittente, chiedi_destinatario, 
-    chiedi_codice_sconto, stampa_riepilogo, 
-    conferma_operazione, gestisci_modifiche
-)
-import shipitalia
+import app_logic
+import check_token
+import config
 import ebay
 import history
-from history import leggi_storico_locale
+import input_utils
+import logger
+import services
+import shipitalia
+import ui
+import utils
 
 def main():
-    log.info("--- Avvio Applicazione ---")
+    logger.log.info("--- Avvio Applicazione ---")
 
     # 1. Controlli iniziali
     try:
-        validate_config()
+        config.validate_config()
     except RuntimeError as e:
         ui.avviso_errore(f"CONFIG ERROR: {e}")
         return
 
     print("⏳ Controllo token...")
-    avviso_token = check_scadenza_token_silenzioso()
+    avviso_token = check_token.check_scadenza_token_silenzioso()
     if avviso_token:
         print("\n" + "!" * 60)
         print(avviso_token)
@@ -49,7 +34,7 @@ def main():
             return
         time.sleep(3)
 
-    service = SpedizioniService(ebay, shipitalia, history)
+    service = services.SpedizioniService(ebay, shipitalia, history)
 
     # 2. Loop Principale
     while True:
@@ -106,7 +91,7 @@ def main():
                         print(f"\nƒo. Selezionato: {titolo_oggetto}")
                         break
                     elif action["action"] == "tracking":
-                        tracking_link = genera_link_tracking(action["tracking"])
+                        tracking_link = utils.genera_link_tracking(action["tracking"])
                         print(f"\n🚚 Tracking: {tracking_link}")
                         input("Premi INVIO per tornare indietro...")
                         continue  
@@ -129,7 +114,7 @@ def main():
                     continue
                 
                 input_ebay = input("Incolla Order ID eBay: ").strip()
-                if valido_order_id(input_ebay):
+                if utils.valido_order_id(input_ebay):
                     order_id = input_ebay
                     tipo_operazione = "EBAY"
                     titolo_oggetto = "Inserito manualmente"
@@ -172,7 +157,7 @@ def main():
         # --- STORICO API SHIPITALIA ---
         elif scelta == "4":
             print("\n   ☁️  Scarico dati...")
-            lista = service.lista_spedizioni(limit=15)
+            lista = service.lista_spedizioni_cached(limit=15)
             if not lista:
                 ui.avviso_errore("Nessuna spedizione trovata.")
                 time.sleep(2)
@@ -196,7 +181,7 @@ def main():
 
         # --- STORICO LOCALE ---
         elif scelta == "5":
-            storico = leggi_storico_locale()
+            storico = history.leggi_storico_locale()
             if not storico:
                 ui.avviso_errore("Nessuno storico locale.")
                 time.sleep(2)
@@ -215,23 +200,23 @@ def main():
         #       FLUSSO CREAZIONE ETICHETTA
         # ==========================================
         try:
-            peso = chiedi_peso()
-            mittente = carica_mittente()
-            destinatario = destinatario_auto if destinatario_auto else chiedi_destinatario()
-            sconto = chiedi_codice_sconto()
+            peso = input_utils.chiedi_peso()
+            mittente = input_utils.carica_mittente()
+            destinatario = destinatario_auto if destinatario_auto else input_utils.chiedi_destinatario()
+            sconto = input_utils.chiedi_codice_sconto()
 
-            payload = build_payload(peso, mittente, destinatario, sconto)
+            payload = app_logic.build_payload(peso, mittente, destinatario, sconto)
 
             while True:
-                stampa_riepilogo(payload, order_id)
-                if conferma_operazione(): break
-                gestisci_modifiche(payload)
+                input_utils.stampa_riepilogo(payload, order_id)
+                if input_utils.conferma_operazione(): break
+                input_utils.gestisci_modifiche(payload)
 
             print("\n⏳ Generazione in corso...")
             result = service.crea_etichetta(payload)
             tracking = result["trackingCode"]
 
-            log.successo(f"Creata etichetta: {tracking}")
+            logger.log.successo(f"Creata etichetta: {tracking}")
             print(f"✅ Etichetta creata: {tracking}")
 
             service.salva_storico(
@@ -243,7 +228,8 @@ def main():
             )
             print("💾 Salvato nello storico locale.")
 
-            if order_id and valido_order_id(order_id):
+            service.invalida_ship_cache()
+            if order_id and utils.valido_order_id(order_id):
                 service.aggiorna_tracking_ebay(order_id, tracking)
                 
                 # IMPORTANTE: Invalidiamo la cache dopo aver spedito un ordine eBay.
@@ -259,7 +245,7 @@ def main():
 
         except Exception as e:
             ui.avviso_errore(f"Errore processo: {e}")
-            log.errore(f"Errore main flow: {e}")
+            logger.log.errore(f"Errore main flow: {e}")
             input("Premi INVIO...")
 
 if __name__ == "__main__":
