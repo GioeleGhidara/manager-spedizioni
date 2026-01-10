@@ -144,3 +144,38 @@ def avviso_errore(msg):
 
 def avviso_info(msg):
     print(f"ℹ️  {msg}")
+
+# ------------------------------------
+
+def stampa_dettagli_poste_completi(tracking, dati_json):
+    if not dati_json:
+        print(f"❌ Nessun dato trovato per {tracking}")
+        return
+
+    prodotto = dati_json.get('tipoProdotto', 'Spedizione')
+    prevista = dati_json.get('dataPrevistaConsegna', '')
+    
+    print(f"\n📦 TRACKING POSTE: {tracking}")
+    print(f"   Prodotto: {prodotto}")
+    if prevista:
+        print(f"   📅 Previsione: {prevista}")
+    
+    print("\n   --- STORIA MOVIMENTI ---")
+    movimenti = dati_json.get("listaMovimenti", [])
+    
+    # Li stampiamo dal più recente al più vecchio (invertendo la lista)
+    for mov in reversed(movimenti):
+        stato = mov.get("statoLavorazione", "")
+        luogo = mov.get("luogo", "").title() # .title() rende Maiuscole Le Iniziali
+        ts = mov.get("dataOra")
+        
+        data_str = "??/?? ??:??"
+        if ts:
+            dt = utils.datetime.fromtimestamp(ts / 1000)
+            data_str = dt.strftime("%d/%m %H:%M")
+            
+        print(f"   🔹 {data_str} | {stato}")
+        if luogo:
+            print(f"       📍 {luogo}")
+            
+    print("")

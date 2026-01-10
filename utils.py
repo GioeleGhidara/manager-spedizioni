@@ -1,9 +1,14 @@
+from datetime import datetime
+
+import config
 import math
 import re
 import requests
+
+import logger
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-import config
+
 
 def get_robust_session():
     """
@@ -67,3 +72,87 @@ def valido_order_id(order_id: str) -> bool:
 def genera_link_tracking(tracking_code: str) -> str:
     """Genera il link diretto per il tracking (attualmente Poste Italiane)."""
     return f"https://www.poste.it/cerca/#/risultati-spedizioni/{tracking_code}"
+
+def get_stato_tracking_poste(tracking_code):
+    """Scarica il JSON raw dalle API Poste."""
+    if not tracking_code: return None
+    
+    url = 'https://www.poste.it/online/dovequando/DQ-REST/ricercasemplice'
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json;charset=UTF-8',
+        'Origin': 'https://www.poste.it',
+        'Referer': 'https://www.poste.it/cerca/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
+    }
+    payload = {'tipoRichiedente': 'WEB', 'codiceSpedizione': tracking_code, 'periodoRicerca': 1}
+
+    def _mask_tracking(code: str) -> str:
+        if not code:
+            return "N/A"
+        if len(code) <= 6:
+            return "***"
+        return f"{code[:3]}...{code[-3:]}"
+
+    try:
+        session = get_robust_session()
+        response = session.post(url, json=payload, headers=headers, timeout=10)
+        if response.status_code != 200:
+            logger.log.warning(
+                f"Poste tracking HTTP {response.status_code} (tracking={_mask_tracking(tracking_code)})"
+            )
+            return None
+        try:
+            data = response.json()
+        except ValueError as e:
+            logger.log.warning(
+                f"Poste tracking JSON non valido (tracking={_mask_tracking(tracking_code)}): {e}"
+            )
+            return None
+        if not data:
+            logger.log.warning(
+                f"Poste tracking risposta vuota (tracking={_mask_tracking(tracking_code)})"
+            )
+        return data
+    except requests.RequestException as e:
+        logger.log.warning(
+            f"Poste tracking richiesta fallita (tracking={_mask_tracking(tracking_code)}): {e}"
+        )
+    except Exception as e:
+        logger.log.errore(
+            f"Poste tracking errore inatteso (tracking={_mask_tracking(tracking_code)}): {e}"
+        )
+    return None
+
+def formatta_stato_poste(dati_json):
+    """
+    Analizza il JSON di Poste e restituisce una stringa riassuntiva.
+    Es: '10/01 14:30 | In consegna (Milano)'
+    """
+    if not dati_json: return "Nessuna info."
+    
+    movimenti = dati_json.get("listaMovimenti", [])
+    if not movimenti:
+        return f"Stato: {dati_json.get('stato', 'Sconosciuto')}"
+
+    # L'ultimo elemento della lista è il più recente
+    ultimo_evento = movimenti[-1]
+    
+    stato = ultimo_evento.get("statoLavorazione", "N.D.").strip()
+    luogo = ultimo_evento.get("luogo", "").strip()
+    
+    # Conversione data da Millisecondi (Timestamp Unix * 1000)
+    data_fmt = ""
+    ts_ms = ultimo_evento.get("dataOra")
+    if ts_ms:
+        try:
+            dt = datetime.fromtimestamp(ts_ms / 1000)
+            data_fmt = dt.strftime("%d/%m %H:%M")
+        except: pass
+
+    # Costruiamo la stringa finale
+    output = f"{stato}"
+    if luogo: output += f" [{luogo}]"
+    if data_fmt: output = f"{data_fmt} | {output}"
+    
+    return output

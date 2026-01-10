@@ -91,10 +91,23 @@ def main():
                         print(f"\nƒo. Selezionato: {titolo_oggetto}")
                         break
                     elif action["action"] == "tracking":
-                        tracking_link = utils.genera_link_tracking(action["tracking"])
-                        print(f"\n🚚 Tracking: {tracking_link}")
+                        code = action["tracking"]
+                        print(f"\n🔍 Analisi tracking {code}...")
+                        
+                        # 1. Scarica Dati
+                        dati_poste = utils.get_stato_tracking_poste(code)
+                        
+                        if dati_poste:
+                            # 2. Mostra dettaglio pulito
+                            ui.stampa_dettagli_poste_completi(code, dati_poste)
+                        else:
+                            # Fallback vecchio: solo link
+                            print("⚠️  Info API non disponibili.")
+                            link = utils.genera_link_tracking(code)
+                            print(f"🌐 Link Web: {link}")
+
                         input("Premi INVIO per tornare indietro...")
-                        continue  
+                        continue
                     ui.avviso_errore("Numero non valido.")
                 except ValueError:
                     pass
