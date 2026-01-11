@@ -77,3 +77,25 @@ def build_payload(
     if discount_code:
         payload["discountCode"] = discount_code
     return payload
+
+def resolve_dashboard_selection(ordini: List[dict], selection_index: int) -> dict:
+    """
+    Decodifica una selezione 1-based e ritorna un'azione.
+    Azioni possibili: order, tracking, tracking_unavailable, invalid.
+    """
+    total = len(ordini)
+    if selection_index < 1 or selection_index > total:
+        return {"action": "invalid"}
+
+    ordine = ordini[selection_index - 1]
+    stato = ordine.get("dashboard_status", "")
+    tracking = ordine.get("tracking")
+
+    if stato == "DA SPEDIRE":
+        return {"action": "order", "order": ordine}
+
+    if tracking and tracking != "N.D.":
+        # MODIFICA QUI: Aggiungiamo "status": stato al dizionario di ritorno
+        return {"action": "tracking", "tracking": tracking, "status": stato}
+
+    return {"action": "tracking_unavailable"}

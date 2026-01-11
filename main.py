@@ -16,8 +16,6 @@ import shipitalia
 import ui
 import utils
 
-# --- FIX ENCODING PER EMOJI (Essenziale su Windows) ---
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 def main():
     logger.log.info("--- Avvio Applicazione ---")
@@ -71,10 +69,13 @@ def main():
                 input("\nPremi INVIO...")
                 continue
 
-            ui.stampa_dashboard_ebay(ordini_dashboard, cambiamenti)
-
             totale = len(ordini_dashboard)
+            
             while True:
+                # 1. Pulizia e Stampa Dashboard (dentro il ciclo per il refresh)
+                ui.stampa_header()
+                ui.stampa_dashboard_ebay(ordini_dashboard, cambiamenti)
+
                 sel = ui.chiedi_scelta_range(totale)
                 if sel == '0':
                     skip_creazione = True
@@ -83,6 +84,8 @@ def main():
                 try:
                     idx = int(sel)
                     action = service.resolve_dashboard(ordini_dashboard, idx)
+                    
+                    # CASO A: Ordine da spedire
                     if action["action"] == "order":
                         ordine = action["order"]
                         order_id = ordine['order_id']
@@ -90,11 +93,22 @@ def main():
                         titolo_oggetto = ordine['title']
                         tipo_operazione = "EBAY"
                         print(f"\n📦 Selezionato: {titolo_oggetto}")
-                        break
+                        break # Esce dal ciclo dashboard e va alla creazione etichetta
+                    
+                    # CASO B: Tracking (Visualizzazione)
                     elif action["action"] == "tracking":
                         code = action["tracking"]
-                        print(f"\n🔎 Analisi tracking {code}...")
+                        status_check = action.get("status", "")
 
+                        # --- CONTROLLO ETICHETTA CREATA (Reintrodotto) ---
+                        if status_check == "ETICHETTA CREATA":
+                            print(f"\nℹ️  Stato: {status_check}")
+                            print("   📦 Etichetta generata! Spedisci il pacco per vedere gli aggiornamenti.")
+                            input("\nPremi INVIO per tornare indietro...")
+                            continue # Torna su, pulisce schermo e ristampa la dashboard
+
+                        # --- Tracking Standard (Poste Italiane) ---
+                        print(f"\n🔎 Analisi tracking {code}...")
                         dati_poste = utils.get_stato_tracking_poste_cached(code)
 
                         if dati_poste:
@@ -102,12 +116,15 @@ def main():
                         else:
                             print("Info API non disponibili.")
 
-                        input("Premi INVIO per tornare indietro...")
-                        continue
+                        input("\nPremi INVIO per tornare indietro...")
+                        continue # Torna su, pulisce schermo e ristampa la dashboard
+
+                    # CASO C: Tracking non disponibile o Errore
                     elif action["action"] == "tracking_unavailable":
                         ui.avviso_info("Tracking non disponibile.")
                         input("Premi INVIO per tornare indietro...")
                         continue
+                    
                     ui.avviso_errore("Numero non valido.")
                 except ValueError:
                     pass

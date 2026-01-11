@@ -11,7 +11,7 @@ def pulisci_schermo():
 
 def stampa_header():
     pulisci_schermo()
-    print("=== SPEDIZIONE MANAGER ===")
+    print("\n=== SPEDIZIONE MANAGER ===")
 
 # ------------------------------------
 
