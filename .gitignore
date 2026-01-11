@@ -22,6 +22,7 @@ mittente.txt
 
 # Ignora il database locale (rimuovi questa riga se vuoi il backup su Git)
 storico_spedizioni.json
+dashboard_state.json
 
 # --- File di Sistema Operativo ---
 .DS_Store
