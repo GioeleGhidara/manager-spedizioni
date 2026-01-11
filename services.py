@@ -1,5 +1,7 @@
 import app_logic
+import config
 import utils
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 class SpedizioniService:
@@ -48,6 +50,27 @@ class SpedizioniService:
     def prepara_dashboard_poste(self, giorni=30):
         da_spedire, in_viaggio = self.carica_ordini_cached(giorni)
         ordini = da_spedire + in_viaggio
+        trackings = []
+        for ordine in ordini:
+            tracking = ordine.get("tracking")
+            if tracking and tracking != "N.D.":
+                trackings.append(tracking)
+
+        stato_tracking = {}
+        if trackings:
+            max_workers = max(1, min(len(set(trackings)), config.TRACKING_MAX_WORKERS))
+            if max_workers > 1:
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    future_map = {executor.submit(self._classifica_tracking_poste, t): t for t in set(trackings)}
+                    for future in as_completed(future_map):
+                        t = future_map[future]
+                        try:
+                            stato_tracking[t] = future.result()
+                        except Exception:
+                            stato_tracking[t] = ("ETICHETTA CREATA", "")
+            else:
+                t = trackings[0]
+                stato_tracking[t] = self._classifica_tracking_poste(t)
         stato_precedente = self.history.leggi_stato_dashboard()
         cambiamenti = []
         stato_corrente = {}
@@ -55,7 +78,10 @@ class SpedizioniService:
         for ordine in ordini:
             order_id = ordine.get("order_id")
             tracking = ordine.get("tracking")
-            stato, posizione = self._classifica_tracking_poste(tracking)
+            if tracking and tracking != "N.D.":
+                stato, posizione = stato_tracking.get(tracking, ("ETICHETTA CREATA", ""))
+            else:
+                stato, posizione = self._classifica_tracking_poste(tracking)
             if order_id:
                 stato_corrente[order_id] = {
                     "status": stato,

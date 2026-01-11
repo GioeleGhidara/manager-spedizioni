@@ -9,6 +9,7 @@ load_dotenv(override=False)
 HTTP_RETRIES = 3
 HTTP_BACKOFF_FACTOR = 1
 TRACKING_CACHE_TTL_SECONDS = 3600
+TRACKING_MAX_WORKERS = 4
 
 # --- VARIABILI D'AMBIENTE ---
 # os.getenv leggerà indifferentemente dal Sistema o dal file .env

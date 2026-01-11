@@ -131,7 +131,7 @@ def stampa_dashboard_ebay(ordini, cambiamenti=None):
     cambiamenti_consegnato = [c for c in cambiamenti if c.get('to_status') == 'CONSEGNATO']
     if cambiamenti_consegnato:
         print("=" * width)
-        print('\u2705 CONSEGNATO')
+        print('✅ CONSEGNATO')
         _stampa_cambiamenti(cambiamenti_consegnato)
 
     print("=" * width)
