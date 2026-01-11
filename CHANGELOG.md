@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## v5.1.4 - 2026-01-11
+- Fix Poste tracking status classification for label-created shipments
+- Improve dashboard layout, status updates, and column alignment
+- Ignore dashboard state file
+
 ## v5.1.3 - 2026-01-11
 - Warn before truncating sender/recipient fields
 - Dashboard uses Poste tracking status and position
