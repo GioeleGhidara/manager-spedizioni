@@ -2,10 +2,6 @@ import os
 import sys
 import utils
 
-# Imposta encoding per Windows
-if hasattr(sys.stdout, 'reconfigure'):
-    sys.stdout.reconfigure(encoding='utf-8')
-
 # ------------------------------------
 
 def pulisci_schermo():
@@ -167,15 +163,14 @@ def stampa_dettaglio_spedizione(idx, spedizione):
 # ------------------------------------
 
 def stampa_storico_locale(storico):
-    print("\n" + "=" * 110)
     print(f" {'DATA':<16} | {'DESTINATARIO':<20} | {'TRACKING':<15} | {'TITOLO'}")
-    print("=" * 110)
+    print("-" * 110)
     
     for s in storico:
         dest = s['destinatario'][:19]
         tit = s['titolo'][:40]
         print(f" {s['data']:<16} | {dest:<20} | {s['tracking']:<15} | {tit}")
-    print("=" * 110)
+    print("-" * 110)
 
 # ------------------------------------
 

@@ -12,11 +12,17 @@ class SpedizioniService:
         self.cache_state = app_logic.CacheState()
         self.ship_cache_state = app_logic.ListCacheState()
 
+# ------------------------------------
+
     def carica_ordini(self, giorni=30):
         return self.ebay.scarica_lista_ordini(giorni)
 
+# ------------------------------------
+
     def get_cache_last_update(self):
         return self.cache_state.last_update
+
+# ------------------------------------
 
     def carica_ordini_cached(self, giorni=30):
         if self.cache_state.ordini is None:
@@ -24,12 +30,19 @@ class SpedizioniService:
             app_logic.set_cache(self.cache_state, da_spedire, in_viaggio)
         return app_logic.get_cached_lists(self.cache_state)
 
+# ------------------------------------
+
     def _classifica_tracking_poste(self, tracking):
         if not tracking or tracking == "N.D.":
             return "DA SPEDIRE", ""
         dati = utils.get_stato_tracking_poste_cached(tracking)
+        if dati is None:
+            return "⚠️ ERR. RETE", ""
         if not dati:
             return "ETICHETTA CREATA", ""
+
+# ------------------------------------
+
         msg = utils.estrai_messaggio_poste(dati)
         if msg and "tracciatura non disponibile" in msg.lower():
             return "ETICHETTA CREATA", ""
@@ -46,6 +59,8 @@ class SpedizioniService:
             return "ETICHETTA CREATA", ""
         posizione = utils.estrai_posizione_poste(dati)
         return "IN TRANSITO", posizione
+
+# ------------------------------------
 
     def prepara_dashboard_poste(self, giorni=30):
         da_spedire, in_viaggio = self.carica_ordini_cached(giorni)
@@ -67,7 +82,8 @@ class SpedizioniService:
                         try:
                             stato_tracking[t] = future.result()
                         except Exception:
-                            stato_tracking[t] = ("ETICHETTA CREATA", "")
+                            # Fallback estremo in caso di crash nel thread
+                            stato_tracking[t] = ("⚠️ ERR. RETE", "")
             else:
                 t = trackings[0]
                 stato_tracking[t] = self._classifica_tracking_poste(t)
@@ -103,17 +119,26 @@ class SpedizioniService:
             if stato != "CONSEGNATO":
                 dashboard.append(item)
         self.history.salva_stato_dashboard(stato_corrente)
-        ordine_stati = ["DA SPEDIRE", "ETICHETTA CREATA", "IN TRANSITO"]
+        ordine_stati = ["DA SPEDIRE", "⚠️ ERR. RETE", "ETICHETTA CREATA", "IN TRANSITO"]
+
+# ------------------------------------
+        
         ordinati = []
         for stato in ordine_stati:
             ordinati.extend([item for item in dashboard if item.get("dashboard_status") == stato])
         return ordinati, cambiamenti
 
+# ------------------------------------
+
     def invalida_cache(self):
         app_logic.invalidate_cache(self.cache_state)
 
+# ------------------------------------
+
     def resolve_dashboard(self, ordini, selection_index):
         return app_logic.resolve_dashboard_selection(ordini, selection_index)
+
+# ------------------------------------
 
     def resolve_lista_spedire(self, da_spedire, selection_index):
         if selection_index < 1 or selection_index > len(da_spedire):
@@ -121,20 +146,30 @@ class SpedizioniService:
         ordine = da_spedire[selection_index - 1]
         return {"action": "order", "order": ordine}
 
+# ------------------------------------
+
     def resolve_storico_index(self, lista, selection_index):
         idx = selection_index - 1
         if 0 <= idx < len(lista):
             return {"action": "item", "index": idx, "item": lista[idx]}
         return {"action": "invalid"}
 
+# ------------------------------------
+
     def crea_etichetta(self, payload):
         return self.ship.genera_etichetta(payload)
+
+# ------------------------------------
 
     def lista_spedizioni(self, limit=15):
         return self.ship.get_lista_spedizioni(limit=limit)
 
+# ------------------------------------
+
     def get_ship_cache_last_update(self):
         return self.ship_cache_state.last_update
+
+# ------------------------------------
 
     def lista_spedizioni_cached(self, limit=15):
         if self.ship_cache_state.items is None:
@@ -142,11 +177,17 @@ class SpedizioniService:
             app_logic.set_list_cache(self.ship_cache_state, lista)
         return app_logic.get_cached_list(self.ship_cache_state)
 
+# ------------------------------------
+
     def invalida_ship_cache(self):
         app_logic.invalidate_list_cache(self.ship_cache_state)
 
+# ------------------------------------
+
     def aggiorna_tracking_ebay(self, order_id, tracking):
         self.ebay.gestisci_ordine_ebay(order_id, tracking)
+
+# ------------------------------------
 
     def salva_storico(self, **kwargs):
         return self.history.salva_in_storico(**kwargs)
