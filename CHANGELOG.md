@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## v5.1.3 - 2026-01-11
+- Warn before truncating sender/recipient fields
+- Dashboard uses Poste tracking status and position
+
 ## v5.1.2 - 2026-01-11
 - Allow editing sender/recipient fields individually
 

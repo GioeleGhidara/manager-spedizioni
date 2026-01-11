@@ -9,6 +9,8 @@ import logger
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+_TRACKING_CACHE = {}
+
 
 def get_robust_session():
     """
@@ -124,6 +126,56 @@ def get_stato_tracking_poste(tracking_code):
         )
     return None
 
+def get_stato_tracking_poste_cached(tracking_code, ttl_seconds=None):
+    """
+    Wrapper con cache in memoria per il tracking Poste.
+    Usa TTL (secondi) per evitare chiamate ripetute.
+    """
+    if not tracking_code:
+        return None
+    if ttl_seconds is None:
+        ttl_seconds = getattr(config, "TRACKING_CACHE_TTL_SECONDS", 3600)
+
+    now = datetime.now()
+    cached = _TRACKING_CACHE.get(tracking_code)
+    if cached:
+        age = (now - cached["ts"]).total_seconds()
+        if age <= ttl_seconds:
+            return cached["data"]
+
+    data = get_stato_tracking_poste(tracking_code)
+    if data is not None:
+        _TRACKING_CACHE[tracking_code] = {"ts": now, "data": data}
+        return data
+
+    # Se la fetch fallisce e avevamo dati in cache, usiamo quelli stale.
+    if cached:
+        return cached["data"]
+    return None
+
+
+
+def estrai_stato_poste(dati_json):
+    """Estrae lo stato piu recente da Poste, se presente."""
+    if not dati_json:
+        return ""
+    if isinstance(dati_json, dict):
+        movimenti = dati_json.get("listaMovimenti", [])
+        if movimenti:
+            ultimo = movimenti[-1]
+            stato = ultimo.get("statoLavorazione") or ultimo.get("statoSpedizione")
+            if stato:
+                return str(stato)
+        stato = dati_json.get("stato")
+        if stato:
+            return str(stato)
+    if isinstance(dati_json, list) and dati_json:
+        ultimo = dati_json[-1]
+        if isinstance(ultimo, dict):
+            stato = ultimo.get("statoLavorazione") or ultimo.get("statoSpedizione") or ultimo.get("stato")
+            if stato:
+                return str(stato)
+    return ""
 def formatta_stato_poste(dati_json):
     """
     Analizza il JSON di Poste e restituisce una stringa riassuntiva.
@@ -156,3 +208,40 @@ def formatta_stato_poste(dati_json):
     if data_fmt: output = f"{data_fmt} | {output}"
     
     return output
+
+def estrai_messaggio_poste(dati_json):
+    """Estrae un messaggio testuale da risposte Poste, se presente."""
+    if isinstance(dati_json, dict):
+        for key in ("messaggio", "message", "descrizione", "description", "msg", "errore", "error", "note"):
+            val = dati_json.get(key)
+            if isinstance(val, str) and val.strip():
+                return val
+        for key, val in dati_json.items():
+            if isinstance(val, str) and "tracciatura" in val.lower():
+                return val
+    if isinstance(dati_json, list):
+        for item in dati_json:
+            if isinstance(item, dict):
+                for key in ("messaggio", "message", "descrizione", "description", "msg", "errore", "error", "note"):
+                    val = item.get(key)
+                    if isinstance(val, str) and val.strip():
+                        return val
+    return ""
+
+def estrai_posizione_poste(dati_json):
+    """Estrae la posizione piu recente dalle risposte Poste, se presente."""
+    if isinstance(dati_json, dict):
+        movimenti = dati_json.get("listaMovimenti", [])
+        if movimenti:
+            ultimo = movimenti[-1]
+            luogo = ultimo.get("luogo")
+            if luogo:
+                return str(luogo).title()
+    if isinstance(dati_json, list) and dati_json:
+        ultimo = dati_json[-1]
+        if isinstance(ultimo, dict):
+            luogo = ultimo.get("luogo") or ultimo.get("sede") or ultimo.get("city")
+            if luogo:
+                return str(luogo).title()
+    return ""
+

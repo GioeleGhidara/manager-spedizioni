@@ -45,24 +45,25 @@ def invalidate_list_cache(state: ListCacheState) -> None:
     state.last_update = None
 
 
-def resolve_dashboard_selection(da_spedire: List[dict], in_viaggio: List[dict], selection_index: int) -> dict:
+def resolve_dashboard_selection(ordini: List[dict], selection_index: int) -> dict:
     """
     Decodifica una selezione 1-based e ritorna un'azione.
     Azioni possibili: order, tracking, tracking_unavailable, invalid.
     """
-    total = len(da_spedire) + len(in_viaggio)
+    total = len(ordini)
     if selection_index < 1 or selection_index > total:
         return {"action": "invalid"}
 
-    len_ds = len(da_spedire)
-    if selection_index <= len_ds:
-        ordine = da_spedire[selection_index - 1]
+    ordine = ordini[selection_index - 1]
+    stato = ordine.get("dashboard_status", "")
+    tracking = ordine.get("tracking")
+
+    if stato == "DA SPEDIRE":
         return {"action": "order", "order": ordine}
 
-    ordine = in_viaggio[selection_index - len_ds - 1]
-    tracking = ordine.get("tracking")
     if tracking and tracking != "N.D.":
         return {"action": "tracking", "tracking": tracking}
+
     return {"action": "tracking_unavailable"}
 
 

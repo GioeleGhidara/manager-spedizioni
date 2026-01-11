@@ -21,11 +21,11 @@ def stampa_header():
 
 def stampa_menu_principale():
     print("\nCosa vuoi fare?")
-    print("1) 📋 Dashboard Ordini (eBay)")
-    print("2) 📦 Spedisci da Lista (eBay)") 
-    print("3) 🚀 Etichetta rapida")
-    print("4) 🔍 Storico ShipItalia (PDF e API)")
-    print("5) 📒 Storico Locale (Dettagliato)")
+    print("1) 📦 Dashboard Ordini (eBay)")
+    print("2) 📄 Spedisci da Lista (eBay)")
+    print("3) ⚡ Etichetta rapida")
+    print("4) 📚 Storico ShipItalia (PDF e API)")
+    print("5) 🗂️  Storico Locale (Dettagliato)")
     print("0) ❌ Esci")
 
 # ------------------------------------
@@ -42,52 +42,99 @@ def chiedi_scelta_range(max_val, label_zero="Menu"):
 
 # ------------------------------------
 
-def stampa_dashboard_ebay(da_spedire, in_viaggio):
-    print("\n" + "=" * 120)
-    print(f" {'#':<3} | {'ID ORDINE':<14} | {'DATA':<11} | {'UTENTE':<15} | {'TRACKING / STATO':<18} | {'TITOLO OGGETTO'}")
-    print("=" * 120)
-
-    # DA SPEDIRE
-    if da_spedire:
-        print(" 🔴  DA SPEDIRE")
-        for i, o in enumerate(da_spedire):
-            print(f" {i+1:<3} | {o['order_id'][:14]:<14} | {o['date']:<11} | {o['buyer']:<15} | {'DA SPEDIRE':<18} | {o['title']}")
-    else:
-        print(" ✅  Tutto spedito!")
-
-    print("-" * 120)
-
-    # IN VIAGGIO
-    if in_viaggio:
-        print(" 🚚  IN VIAGGIO")
-        start_idx = len(da_spedire) + 1
-        for i, o in enumerate(in_viaggio):
-            idx = start_idx + i
-            trk_display = o.get('tracking', 'N.D.')
-            print(f" {idx:<3} | {o['order_id'][:14]:<14} | {o['shipped_at']:<11} | {o['buyer']:<15} | {trk_display:<18} | {o['title']}")
-
-    print("=" * 120)
-
-# ------------------------------------
-
-def stampa_lista_selezione_ebay(da_spedire):
-    """
-    Stampa una tabella semplificata solo per la selezione 'Da Spedire'.
-    """
-    if not da_spedire:
-        print("\n✅ Nessun ordine in attesa di spedizione.")
+def stampa_dashboard_ebay(ordini, cambiamenti=None):
+    if not ordini and not cambiamenti:
+        print("\nNessun ordine attivo trovato.")
         return
 
-    print(f"\n📦 TROVATI {len(da_spedire)} ORDINI DA EVADERE:")
-    print("=" * 100)
-    print(f" {'#':<3} | {'DATA':<11} | {'UTENTE':<15} | {'TITOLO OGGETTO'}")
-    print("=" * 100)
+    if cambiamenti is None:
+        cambiamenti = []
 
-    for i, o in enumerate(da_spedire):
-        titolo = o['title'][:55] + ".." if len(o['title']) > 55 else o['title']
-        print(f" {i+1:<3} | {o['date']:<11} | {o['buyer']:<15} | {titolo}")
-    
-    print("-" * 100)
+    width = 150
+    w_idx = 3
+    w_id = 14
+    w_data = 11
+    w_utente = 15
+    w_tracking = 15
+    w_stato = 18
+    w_pos = 18
+    w_titolo = 40
+
+    def _trunca(val, max_len):
+        s = str(val) if val is not None else ""
+        if len(s) > max_len:
+            return s[: max_len - 2] + ".."
+        return s
+
+    header = (
+        f" {'#':<{w_idx}} | {'DATA':<{w_data}} | {'UTENTE':<{w_utente}} | "
+        f"{'STATO':<{w_stato}} | {'POSIZIONE':<{w_pos}} | {'TITOLO':<{w_titolo}}"
+    )
+    print("\n" + "=" * width)
+    print(header)
+
+    label_stato = {
+        'DA SPEDIRE': '📦 DA SPEDIRE',
+        'ETICHETTA CREATA': '🏷️  ETICHETTA CREATA',
+        'IN TRANSITO': '🚚 IN TRANSITO',
+        'CONSEGNATO': '✅ CONSEGNATO',
+    }
+    label_tabella = {
+        'DA SPEDIRE': '📦 DA SPEDIRE',
+        'ETICHETTA CREATA': '🏷️  ETICHETTA',
+        'IN TRANSITO': '🚚 IN TRANSITO',
+        'CONSEGNATO': '✅ CONSEGNATO',
+    }
+
+    def _stampa_cambiamenti(lista):
+        if not lista:
+            return
+        for c in lista:
+            da = label_tabella.get(c.get('from_status', ''), c.get('from_status', '')).lower()
+            a = label_tabella.get(c.get('to_status', ''), c.get('to_status', '')).lower()
+            titolo_riga = _trunca(c.get('title', ''), w_titolo)
+            if c.get('to_status') == 'CONSEGNATO':
+                print(f"-> {titolo_riga} consegnato, controlla lo stato del pagamento")
+            else:
+                print(f"-> aggiornamento: {titolo_riga} passato da {da} a {a}")
+
+    gruppi = {'DA SPEDIRE': [], 'ETICHETTA CREATA': [], 'IN TRANSITO': []}
+    for ordine in ordini:
+        stato = ordine.get('dashboard_status', '')
+        gruppi.setdefault(stato, []).append(ordine)
+
+    idx = 1
+    for stato in ('DA SPEDIRE', 'ETICHETTA CREATA', 'IN TRANSITO'):
+        lista = gruppi.get(stato, [])
+        cambiamenti_stato = [c for c in cambiamenti if c.get('to_status') == stato]
+        if not lista and not cambiamenti_stato:
+            continue
+        print("=" * width)
+        print(f"{label_stato.get(stato, stato)}")
+        if cambiamenti_stato:
+            _stampa_cambiamenti(cambiamenti_stato)
+        if not lista:
+            print('Nessun ordine in questo stato.')
+            continue
+        for o in lista:
+            data = _trunca(o.get('date', ''), w_data)
+            utente = _trunca(o.get('buyer', ''), w_utente)
+            posizione = _trunca(o.get('dashboard_posizione', ''), w_pos)
+            titolo = _trunca(o.get('title', ''), w_titolo)
+            stato_cell = label_tabella.get(stato, stato)
+            print(
+                f" {idx:<{w_idx}} | {data:<{w_data}} | {utente:<{w_utente}} | "
+                f"{stato_cell:<{w_stato}} | {posizione:<{w_pos}} | {titolo:<{w_titolo}}"
+            )
+            idx += 1
+
+    cambiamenti_consegnato = [c for c in cambiamenti if c.get('to_status') == 'CONSEGNATO']
+    if cambiamenti_consegnato:
+        print("=" * width)
+        print('\u2705 CONSEGNATO')
+        _stampa_cambiamenti(cambiamenti_consegnato)
+
+    print("=" * width)
 
 # ------------------------------------
 

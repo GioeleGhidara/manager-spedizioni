@@ -4,6 +4,20 @@ import utils
 
 _MITTENTE_CACHE = None
 
+_LIMITI_TRONCAMENTO = {
+    'name': 40,
+    'address': 40,
+    'city': 36,
+    'postalCode': 10,
+}
+
+_LABEL_CAMPI = {
+    'name': 'Nome',
+    'address': 'Indirizzo',
+    'city': 'Citta',
+    'postalCode': 'CAP',
+}
+
 # --- FUNZIONI DI INPUT ---
 
 def chiedi_peso() -> float:
@@ -187,6 +201,38 @@ def modifica_contatto(contatto, label: str):
             contatto.update(chiedi_indirizzo_guidato())
         else:
             print("Scelta non valida.")
+
+
+def _calcola_troncamento(valore, limite):
+    pulito = str(valore).strip()
+    return pulito, pulito[:limite]
+
+def verifica_troncamenti_contatto(contatto, label: str):
+    for campo, limite in _LIMITI_TRONCAMENTO.items():
+        if campo not in contatto:
+            continue
+        while True:
+            originale, troncato = _calcola_troncamento(contatto.get(campo, ''), limite)
+            if len(originale) <= limite:
+                break
+            nome_campo = _LABEL_CAMPI.get(campo, campo)
+            print(f"\nATTENZIONE: {label} - {nome_campo} supera {limite} caratteri.")
+            print(f"Prima: {originale}")
+            print(f"Dopo : {troncato}")
+            risp = input("Va bene il troncamento? (S/N): ").strip().lower()
+            if risp == 's':
+                contatto[campo] = troncato
+                break
+            nuovo = input(f"Inserisci nuovo {nome_campo}: ").strip()
+            contatto[campo] = nuovo
+
+def verifica_troncamenti_payload(payload):
+    if not payload:
+        return
+    if 'sender' in payload and isinstance(payload['sender'], dict):
+        verifica_troncamenti_contatto(payload['sender'], 'MITTENTE')
+    if 'recipient' in payload and isinstance(payload['recipient'], dict):
+        verifica_troncamenti_contatto(payload['recipient'], 'DESTINATARIO')
 
 # --- FUNZIONI DI OUTPUT (UI) & MODIFICA ---
 

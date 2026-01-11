@@ -4,6 +4,8 @@ from datetime import datetime
 
 FILE_STORICO = "storico_spedizioni.json"
 
+FILE_DASHBOARD_STATE = "dashboard_state.json"
+
 def salva_in_storico(tipo, destinatario, tracking, order_id=None, titolo=None):
     """
     Salva una nuova spedizione nel file JSON locale.
@@ -48,3 +50,23 @@ def leggi_storico_locale():
             return json.load(f)
     except:
         return []
+
+def leggi_stato_dashboard():
+    if not os.path.exists(FILE_DASHBOARD_STATE):
+        return {}
+    try:
+        with open(FILE_DASHBOARD_STATE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+def salva_stato_dashboard(stato):
+    try:
+        with open(FILE_DASHBOARD_STATE, "w", encoding="utf-8") as f:
+            json.dump(stato, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"Errore salvataggio stato dashboard: {e}")
+        return False
+
