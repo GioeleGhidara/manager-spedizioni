@@ -88,7 +88,7 @@ def main():
                         destinatario_auto = ordine['destinatario']
                         titolo_oggetto = ordine['title']
                         tipo_operazione = "EBAY"
-                        print(f"\nƒo. Selezionato: {titolo_oggetto}")
+                        print(f"\n Selezionato: {titolo_oggetto}")
                         break
                     elif action["action"] == "tracking":
                         code = action["tracking"]

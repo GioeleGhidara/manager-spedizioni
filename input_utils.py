@@ -16,10 +16,17 @@ def chiedi_peso() -> float:
 
 def chiedi_codice_sconto() -> str:
     """Chiede un codice sconto opzionale."""
-    codice = input("Codice Sconto (INVIO per nessuno): ").strip().upper()
-    if codice:
-        print(f"   🎟️  Codice inserito: {codice}")
-    return codice
+    codice_default = "SHIPITALIA30"
+    scelta = input(
+        f"Codice sconto predefinito: {codice_default}. Vuoi cambiarlo? (s/N): "
+    ).strip().lower()
+    if scelta == "s":
+        codice = input("Nuovo codice sconto (INVIO per nessuno): ").strip().upper()
+        if codice:
+            print(f"   Codice inserito: {codice}")
+        return codice
+    print(f"   Codice inserito: {codice_default}")
+    return codice_default
 
 def parse_indirizzo_blocco(testo: str):
     """Analizza un indirizzo incollato a blocco."""
