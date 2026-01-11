@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## v5.1.2 - 2026-01-11
+- Allow editing sender/recipient fields individually
+
+## v5.1.1 - 2026-01-11
+- Add changelog
+
 ## v5.1.0 - 2026-01-11
 - Add default discount code prompt
 

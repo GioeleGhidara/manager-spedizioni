@@ -158,6 +158,36 @@ def carica_mittente():
     print("⚠️  Passiamo all'inserimento manuale.")
     return chiedi_indirizzo_guidato()
 
+def modifica_contatto(contatto, label: str):
+    """Permette di modificare solo i campi desiderati di un contatto."""
+    while True:
+        print(f"\nMODIFICA {label}")
+        print(f"1) Nome: {contatto.get('name', 'N.D.')}")
+        print(f"2) Indirizzo: {contatto.get('address', '')}")
+        print(f"3) CAP: {contatto.get('postalCode', '')}")
+        print(f"4) Citta: {contatto.get('city', '')}")
+        print(f"5) Telefono: {contatto.get('phone', '')}")
+        print("6) Inserimento guidato (sostituisce tutti i campi)")
+        print("0) Fine modifiche")
+
+        scelta = input("Cosa vuoi modificare? (0-6): ").strip()
+        if scelta == "0":
+            return
+        elif scelta == "1":
+            contatto["name"] = input("   Nome: ").strip()
+        elif scelta == "2":
+            contatto["address"] = input("   Indirizzo: ").strip()
+        elif scelta == "3":
+            contatto["postalCode"] = input("   CAP: ").strip()
+        elif scelta == "4":
+            contatto["city"] = input("   Citta: ").strip()
+        elif scelta == "5":
+            contatto["phone"] = utils.normalizza_telefono(input("   Telefono: ").strip())
+        elif scelta == "6":
+            contatto.update(chiedi_indirizzo_guidato())
+        else:
+            print("Scelta non valida.")
+
 # --- FUNZIONI DI OUTPUT (UI) & MODIFICA ---
 
 def stampa_riepilogo(payload, order_id):
@@ -219,12 +249,12 @@ def gestisci_modifiche(payload):
     scelta = input("Cosa vuoi correggere? (1-5): ").strip()
     
     if scelta == "1":
-        print("\n✏️  Reinserisci MITTENTE:")
-        payload['sender'] = carica_mittente()
-    
+        print("\nModifica MITTENTE:")
+        modifica_contatto(payload['sender'], "MITTENTE")
+
     elif scelta == "2":
-        print("\n✏️  Reinserisci DESTINATARIO:")
-        payload['recipient'] = chiedi_destinatario()
+        print("\nModifica DESTINATARIO:")
+        modifica_contatto(payload['recipient'], "DESTINATARIO")
     
     elif scelta == "3":
         print("\n⚖️  Reinserisci PESO:")
